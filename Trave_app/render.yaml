@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: travel-app-backend
+    env: node
+    plan: free
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BAIDU_API_KEY
+        value: GD5XCi0eK4xS3jqsLhLQmUdXpWVNZYyC
+      - key: BAIDU_SECRET_KEY
+        value: kxwTL9BbAIs7h82NKv3Ni0lFWOePGySE
+      - key: BAIDU_APP_ID
+        value: "116990948"
+      - key: AMAP_API_KEY
+        value: "你的高德apiKey"
+      - key: DASHSCOPE_API_KEY
+        value: "你的阿里云DashScope API Key"

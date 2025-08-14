@@ -1,0 +1,53 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "tourist1",
+      "email": "tourist1@example.com",
+      "password": "123456",
+      "role": "tourist",
+      "avatar": "default_avatar.png",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "username": "tourist2",
+      "email": "tourist2@example.com",
+      "password": "123456",
+      "role": "tourist",
+      "avatar": "default_avatar.png",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "username": "guide1",
+      "email": "guide1@example.com",
+      "password": "123456",
+      "role": "guide",
+      "avatar": "default_avatar.png",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "username": "guide2",
+      "email": "guide2@example.com",
+      "password": "123456",
+      "role": "guide",
+      "avatar": "default_avatar.png",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "username": "admin",
+      "email": "admin@example.com",
+      "password": "123456",
+      "role": "admin",
+      "avatar": "default_avatar.png",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "bindings": [],
+  "photos": [],
+  "feedback": [],
+  "resetRequests": []
+}

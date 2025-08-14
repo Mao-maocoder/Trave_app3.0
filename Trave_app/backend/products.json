@@ -1,0 +1,34 @@
+[
+  {
+    "id": "stamp_001",
+    "name": "中轴线邮票",
+    "desc": "限量纪念邮票",
+    "points": 100,
+    "image": "assets/products/stamp_001.png",
+    "buyUrl": "https://yourshop.com/buy/stamp_001"
+  },
+  {
+    "id": "penholder_001",
+    "name": "斗拱笔架",
+    "desc": "仿古斗拱造型笔架",
+    "points": 200,
+    "image": "assets/products/penholder_001.png",
+    "buyUrl": "https://yourshop.com/buy/penholder_001"
+  },
+  {
+    "id": "stamp_fy001",
+    "name": "《飞阅中轴线》邮票集",
+    "desc": "跨度28年，一册集齐北京中轴线邮票美景",
+    "points": 180,
+    "image": "assets/products/stamp_fy001.png",
+    "buyUrl": "https://tuicashier.youzan.com/pay/wscgoods_order?alias=2707e46s0yewu09"
+  },
+  {
+    "id": "stamp_fy002",
+    "name": "飞阅中轴线 文创珍藏册邮票",
+    "desc": "故宫博物院成立100周年版",
+    "points": 220,
+    "image": "assets/products/stamp_fy002.png",
+    "buyUrl": "https://tuicashier.youzan.com/pay/wscgoods_order?alias=35z36s4ckawgyve"
+  }
+] 

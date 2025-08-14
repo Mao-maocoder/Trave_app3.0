@@ -1,0 +1,14 @@
+[
+  {
+    "id": "wooden_craft",
+    "name": "木石匠心",
+    "desc": "故宫榫卯拼装成就",
+    "icon": "assets/achievements/wooden_craft.png"
+  },
+  {
+    "id": "light_poet",
+    "name": "光线诗人",
+    "desc": "乾清宫与太阳神庙对比打卡",
+    "icon": "assets/achievements/light_poet.png"
+  }
+] 

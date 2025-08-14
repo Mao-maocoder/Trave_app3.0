@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北京中轴线旅游应用 - 测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: white;
+            font-size: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .feature {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .feature h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .feature p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .status {
+            background: #e8f5e8;
+            color: #2d5a2d;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #4caf50;
+        }
+        
+        .spots {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .spots h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .spot-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .spot-tag {
+            background: #ffc107;
+            color: #856404;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🏛️</div>
+        <h1>北京中轴线旅游应用</h1>
+        <p class="subtitle">探索北京中轴线的文化遗产，体验中华文明的魅力</p>
+        
+        <div class="status">
+            <strong>应用状态：</strong> Flutter Web 构建中，当前显示测试页面
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🏛️ 景点浏览</h3>
+                <p>故宫、天坛、钟鼓楼等中轴线重要景点的详细介绍</p>
+            </div>
+            <div class="feature">
+                <h3>🗺️ 地图导航</h3>
+                <p>基于高德地图的实时导航和位置服务</p>
+            </div>
+            <div class="feature">
+                <h3>🎤 语音服务</h3>
+                <p>智能语音导览和语音识别功能</p>
+            </div>
+            <div class="feature">
+                <h3>🌐 多语言</h3>
+                <p>中英文双语支持，国际化体验</p>
+            </div>
+            <div class="feature">
+                <h3>📱 文化展示</h3>
+                <p>创意产品、动画、视频、照片墙等多媒体内容</p>
+            </div>
+            <div class="feature">
+                <h3>📖 旅游手册</h3>
+                <p>详细的旅游指南和实用信息</p>
+            </div>
+        </div>
+        
+        <div class="spots">
+            <h3>主要景点</h3>
+            <div class="spot-list">
+                <span class="spot-tag">故宫</span>
+                <span class="spot-tag">天坛</span>
+                <span class="spot-tag">永定门</span>
+                <span class="spot-tag">前门</span>
+                <span class="spot-tag">钟鼓楼</span>
+                <span class="spot-tag">什刹海万宁桥</span>
+                <span class="spot-tag">先农坛</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 北京中轴线旅游应用</p>
+            <p>技术栈：Flutter + Dart + Web</p>
+        </div>
+    </div>
+</body>
+</html> 
