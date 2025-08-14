@@ -64,13 +64,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // 预加载展览图片
     final exhibitionImages = [
-      'assets/images/spots/故宫.png',
-      'assets/images/spots/天坛.png',
-      'assets/images/spots/钟鼓楼.png',
-      'assets/images/spots/前门.png',
-      'assets/images/spots/永定门.png',
-      'assets/images/spots/先农坛.png',
-      'assets/images/spots/什刹海万宁桥.png',
+      'assets/images/spots/gugong.png',
+      'assets/images/spots/tiantan.png',
+      'assets/images/spots/zhonggulou.png',
+      'assets/images/spots/qianmen.png',
+      'assets/images/spots/yongdingmen.png',
+      'assets/images/spots/xiannongtan.png',
+      'assets/images/spots/shichahai_wanningqiao.png',
     ];
     ImagePreloader.preloadImages(exhibitionImages);
   }
@@ -93,31 +93,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     {
       'title': '中轴奇遇',
       'subtitle': '探索北京中轴线的文化魅力',
-      'image': 'assets/images/spots/故宫.png',
+      'image': 'assets/images/spots/gugong.png',
       'tag': '文化体验',
     },
     {
       'title': '天坛祈年殿',
       'subtitle': '感受古代皇家祭祀文化',
-      'image': 'assets/images/spots/天坛.png',
+      'image': 'assets/images/spots/tiantan.png',
       'tag': '历史古迹',
     },
     {
       'title': '钟鼓楼',
       'subtitle': '聆听古都的时光回响',
-      'image': 'assets/images/spots/钟鼓楼.png',
+      'image': 'assets/images/spots/zhonggulou.png',
       'tag': '文化地标',
     },
     {
       'title': '前门大街',
       'subtitle': '体验老北京风情',
-      'image': 'assets/images/spots/前门.png',
+      'image': 'assets/images/spots/qianmen.png',
       'tag': '民俗文化',
     },
     {
       'title': '永定门',
       'subtitle': '中轴线的南起点',
-      'image': 'assets/images/spots/永定门.png',
+      'image': 'assets/images/spots/yongdingmen.png',
       'tag': '历史地标',
     },
   ];
@@ -878,13 +878,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               },
               itemBuilder: (context, index) {
                 final exhibitions = [
-                  {'title': '故宫博物院', 'subtitle': '紫禁城的秘密', 'image': 'assets/images/spots/故宫.png'},
-                  {'title': '天坛公园', 'subtitle': '祈年殿的传说', 'image': 'assets/images/spots/天坛.png'},
-                  {'title': '钟鼓楼', 'subtitle': '古都时光', 'image': 'assets/images/spots/钟鼓楼.png'},
-                  {'title': '前门大街', 'subtitle': '老北京风情', 'image': 'assets/images/spots/前门.png'},
-                  {'title': '永定门', 'subtitle': '中轴南起点', 'image': 'assets/images/spots/永定门.png'},
-                  {'title': '先农坛', 'subtitle': '古代祭祀文化', 'image': 'assets/images/spots/先农坛.png'},
-                  {'title': '什刹海', 'subtitle': '古都水乡', 'image': 'assets/images/spots/什刹海万宁桥.png'},
+                  {'title': '故宫博物院', 'subtitle': '紫禁城的秘密', 'image': 'assets/images/spots/gugong.png'},
+                  {'title': '天坛公园', 'subtitle': '祈年殿的传说', 'image': 'assets/images/spots/tiantan.png'},
+                  {'title': '钟鼓楼', 'subtitle': '古都时光', 'image': 'assets/images/spots/zhonggulou.png'},
+                  {'title': '前门大街', 'subtitle': '老北京风情', 'image': 'assets/images/spots/qianmen.png'},
+                  {'title': '永定门', 'subtitle': '中轴南起点', 'image': 'assets/images/spots/yongdingmen.png'},
+                  {'title': '先农坛', 'subtitle': '古代祭祀文化', 'image': 'assets/images/spots/xiannongtan.png'},
+                  {'title': '什刹海', 'subtitle': '古都水乡', 'image': 'assets/images/spots/shichahai_wanningqiao.png'},
                 ];
                 final exhibition = exhibitions[index];
                 return Padding(

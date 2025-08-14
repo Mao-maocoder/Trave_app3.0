@@ -16,13 +16,13 @@ class PhotoService {
   Future<List<Map<String, dynamic>>> getPhotos() async {
     // 使用本地资源照片
     return [
-      _createPhotoData('故宫', 'assets/images/spots/故宫.png'),
-      _createPhotoData('天坛', 'assets/images/spots/天坛.png'),
-      _createPhotoData('前门', 'assets/images/spots/前门.png'),
-      _createPhotoData('什刹海万宁桥', 'assets/images/spots/什刹海万宁桥.png'),
-      _createPhotoData('永定门', 'assets/images/spots/永定门.png'),
-      _createPhotoData('先农坛', 'assets/images/spots/先农坛.png'),
-      _createPhotoData('钟鼓楼', 'assets/images/spots/钟鼓楼.png'),
+      _createPhotoData('故宫', 'assets/images/spots/gugong.png'),
+      _createPhotoData('天坛', 'assets/images/spots/tiantan.png'),
+      _createPhotoData('前门', 'assets/images/spots/qianmen.png'),
+      _createPhotoData('什刹海万宁桥', 'assets/images/spots/shichahai_wanningqiao.png'),
+      _createPhotoData('永定门', 'assets/images/spots/yongdingmen.png'),
+      _createPhotoData('先农坛', 'assets/images/spots/xiannongtan.png'),
+      _createPhotoData('钟鼓楼', 'assets/images/spots/zhonggulou.png'),
     ];
   }
 
