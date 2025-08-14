@@ -8,8 +8,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+      # Do NOT set PORT on Render. Render provides PORT automatically and the app must bind to it.
       - key: JWT_SECRET
         generateValue: true
       - key: BAIDU_API_KEY
