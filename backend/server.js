@@ -2505,13 +2505,34 @@ app.post('/api/chats/private', (req, res) => {
 app.get(/^\/assets\/.*/, (req, res, next) => {
   try {
     const originalPath = req.originalUrl.split('?')[0].replace(/^\//, '');
-    const filePath = path.join(__dirname, 'web', originalPath);
-    if (fs.existsSync(filePath)) {
-      return res.sendFile(filePath);
+    const webRoot = path.join(__dirname, 'web');
+
+    const candidates = new Set();
+    // 原始（通常为百分号编码）
+    candidates.add(path.join(webRoot, originalPath));
+
+    // 解码后（中文路径）
+    try { candidates.add(path.join(webRoot, decodeURI(originalPath))); } catch (_) {}
+
+    // 重新编码（防止浏览器已解码成中文再发送）
+    const parts = originalPath.split('/');
+    const reencoded = parts.map((seg) => {
+      // 已经包含百分号的片段认为已编码
+      return /%[0-9A-Fa-f]{2}/.test(seg) ? seg : encodeURIComponent(seg);
+    }).join('/');
+    candidates.add(path.join(webRoot, reencoded));
+
+    // 兼容 assets/images -> assets/assets/images 的目录层差异
+    if (originalPath.startsWith('assets/images/')) {
+      candidates.add(path.join(webRoot, originalPath.replace('assets/images/', 'assets/assets/images/')));
     }
-  } catch (e) {
-    // 忽略，交给后续中间件处理
-  }
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        return res.sendFile(p);
+      }
+    }
+  } catch (e) {}
   next();
 });
 
