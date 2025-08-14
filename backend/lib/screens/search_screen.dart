@@ -6,6 +6,7 @@ import '../services/tourist_spot_service.dart';
 import '../widgets/platform_image.dart';
 import '../utils/performance_config.dart';
 import '../utils/ui_performance.dart';
+import '../constants.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -91,7 +92,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isChinese ? '搜索景点' : 'Search Spots'),
+        title: Text(isChinese ? '搜索景点' : 'Search Spots', style: const TextStyle(fontFamily: kFontFamilyTitle)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -111,10 +112,10 @@ class _SearchScreenState extends State<SearchScreen> {
                       )
                     : null,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(kRadiusInput),
                 ),
                 filled: true,
-                fillColor: Colors.grey[50],
+                fillColor: kCardBackground,
               ),
               onChanged: (value) {
                 _performSearch(value);
@@ -163,6 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
           isChinese ? '热门搜索' : 'Popular Searches',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
+            fontFamily: kFontFamilyTitle,
           ),
         ),
         const SizedBox(height: 16),
@@ -185,6 +187,7 @@ class _SearchScreenState extends State<SearchScreen> {
           isChinese ? '所有景点' : 'All Spots',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
+            fontFamily: kFontFamilyTitle,
           ),
         ),
         const SizedBox(height: 16),
@@ -311,7 +314,15 @@ class _SearchScreenState extends State<SearchScreen> {
           Navigator.pushNamed(
             context,
             '/spot_detail',
-            arguments: {'spotId': spot.id},
+            arguments: {
+              'spot': {
+                'name': spot.name,
+                'image': spot.imageUrl,
+                'description': spot.description,
+                'longitude': spot.longitude,
+                'latitude': spot.latitude,
+              }
+            },
           );
         },
         ),

@@ -99,7 +99,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
         
         return Scaffold(
           appBar: AppBar(
-            title: Text(isChinese ? '旅游手册' : 'Travel Handbook'),
+            title: Text(isChinese ? '旅游手册' : 'Travel Handbook', style: const TextStyle(fontFamily: kFontFamilyTitle)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
@@ -111,8 +111,8 @@ class _HandbookScreenState extends State<HandbookScreen> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: kAccentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(kRadiusButton),
                   ),
                   child: const Icon(Icons.language, size: 20),
                 ),
@@ -150,6 +150,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                           color: Colors.white,
                           fontSize: kFontSizeXxl,
                           fontWeight: FontWeight.bold,
+                          fontFamily: kFontFamilyTitle,
                         ),
                       ),
                       const SizedBox(height: kSpaceS),
@@ -158,6 +159,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: kFontSizeM,
+                          fontFamily: kFontFamilyTitle,
                         ),
                       ),
                     ],
@@ -186,7 +188,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                             vertical: kSpaceM,
                           ),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : AppColors.surface,
+                            color: isSelected ? kPrimaryColor : kSurfaceColor,
                             borderRadius: BorderRadius.circular(kRadiusXl),
                             boxShadow: isSelected ? kShadowMedium : kShadowLight,
                           ),
@@ -194,9 +196,10 @@ class _HandbookScreenState extends State<HandbookScreen> {
                             child: Text(
                               _categories[index],
                               style: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.textPrimary,
+                                color: isSelected ? Colors.white : kTextPrimaryColor,
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 fontSize: kFontSizeM,
+                                fontFamily: kFontFamilyTitle,
                               ),
                             ),
                           ),
@@ -229,7 +232,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: kSpaceL),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: kSurfaceColor,
         borderRadius: BorderRadius.circular(kRadiusL),
         boxShadow: kShadowMedium,
       ),
@@ -239,12 +242,12 @@ class _HandbookScreenState extends State<HandbookScreen> {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: kPrimaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(kRadiusM),
           ),
           child: Icon(
             handbook['icon'],
-            color: AppColors.primary,
+            color: kPrimaryColor,
             size: 30,
           ),
         ),
@@ -264,7 +267,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
             Text(
               isChinese ? handbook['description'] : handbook['descriptionEn'],
               style: const TextStyle(
-                color: AppColors.textLight,
+                color: kTextLightColor,
                 fontSize: kFontSizeM,
               ),
               maxLines: 2,
@@ -276,7 +279,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                 Icon(
                   Icons.description,
                   size: 14,
-                  color: AppColors.textLight,
+                  color: kTextLightColor,
                 ),
                 const SizedBox(width: 4),
                 Flexible(
@@ -286,7 +289,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                         : '${handbook['pages']} pages',
                     style: const TextStyle(
                       fontSize: kFontSizeS,
-                      color: AppColors.textLight,
+                      color: kTextLightColor,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -295,7 +298,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                 Icon(
                   Icons.download,
                   size: 14,
-                  color: AppColors.primary,
+                  color: kPrimaryColor,
                 ),
                 const SizedBox(width: 4),
                 Flexible(
@@ -303,7 +306,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
                     '${handbook['downloads']}',
                     style: const TextStyle(
                       fontSize: kFontSizeS,
-                      color: AppColors.primary,
+                      color: kPrimaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -318,7 +321,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
             _downloadHandbook(handbook, isChinese);
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: kPrimaryColor,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(kRadiusM),
@@ -338,7 +341,7 @@ class _HandbookScreenState extends State<HandbookScreen> {
               ? '正在下载《${handbook['title']}》...'
               : 'Downloading "${handbook['titleEn']}"...',
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: kPrimaryColor,
       ),
     );
   }

@@ -1,18 +1,16 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
-import '../constants.dart';
+import '../utils/api_host.dart';
+import 'dart:js' as js;
+import 'auth_service.dart';
 
 class VoiceService {
-  static const String _baiduApiKey = BaiduVoiceConfig.apiKey;
-  static const String _baiduSecretKey = BaiduVoiceConfig.secretKey;
-  
   static AudioRecorder? _audioRecorder;
   static final AudioPlayer _audioPlayer = AudioPlayer();
   
@@ -28,7 +26,11 @@ class VoiceService {
 
   /// 开始录音
   static Future<void> startRecording() async {
-    if (kIsWeb) throw Exception('Web端暂不支持录音功能');
+    if (kIsWeb) {
+      // Web端使用浏览器原生录音API
+      throw Exception('Web端暂不支持录音功能，请使用移动端应用');
+    }
+    
     await _initRecorder();
     
     if (_audioRecorder != null && await _audioRecorder!.hasPermission()) {
@@ -65,35 +67,37 @@ class VoiceService {
   /// 检查是否正在录音
   static bool get isRecording => _isRecording;
 
-  /// 语音识别（百度语音识别API）
+  /// 语音识别（通过后端API）
   static Future<String> speechToText(String audioFilePath) async {
     try {
       // 读取音频文件
       final audioFile = File(audioFilePath);
       final audioBytes = await audioFile.readAsBytes();
       
-      // 获取百度访问令牌
-      final token = await _getBaiduToken();
-      
-      // 调用百度语音识别API
-      final url = Uri.parse(
-        'https://vop.baidu.com/server_api?cuid=${BaiduVoiceConfig.appId}&token=$token'
+      // 创建multipart请求
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${getApiBaseUrl()}/voice/speech-to-text'),
       );
       
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'audio/pcm;rate=16000',
-        },
-        body: audioBytes,
-      ).timeout(const Duration(seconds: 10));
+      // 添加音频文件
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'audio',
+          audioBytes,
+          filename: 'recording.m4a',
+        ),
+      );
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['result'] != null && data['result'].isNotEmpty) {
-          return data['result'][0];
+        if (data['success'] == true && data['text'] != null) {
+          return data['text'];
         } else {
-          throw Exception('语音识别失败: ${data['err_msg'] ?? '未知错误'}');
+          throw Exception('语音识别失败: ${data['message'] ?? '未知错误'}');
         }
       } else {
         throw Exception('语音识别请求失败: ${response.statusCode}');
@@ -104,27 +108,57 @@ class VoiceService {
     }
   }
 
-  /// 语音合成（百度语音合成API）
+  /// 语音合成（优先使用浏览器原生，回退到后端API）
   static Future<String> textToSpeech(String text, {String lang = 'zh'}) async {
     try {
-      // 获取百度访问令牌
-      final token = await _getBaiduToken();
+      print('开始语音合成，文本: $text');
       
-      // 调用百度语音合成API
-      final url = Uri.parse(
-        'https://tsn.baidu.com/text2audio?tok=$token&cuid=${BaiduVoiceConfig.appId}&ctp=1&lan=$lang&spd=5&pit=5&vol=5&per=0&tex=${Uri.encodeComponent(text)}'
-      );
+      // 优先使用浏览器原生语音合成（更稳定）
+      if (kIsWeb) {
+        try {
+          await _textToSpeechWeb(text, lang);
+          // 返回一个虚拟URL，表示使用浏览器原生合成
+          return 'browser-native-tts';
+        } catch (e) {
+          print('浏览器语音合成失败，尝试后端API: $e');
+        }
+      }
       
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      // 如果浏览器不支持或失败，使用后端API
+      try {
+        final response = await AuthService.authorizedRequest(
+          Uri.parse('${getApiBaseUrl()}/voice/text-to-speech'),
+          method: 'POST',
+          body: jsonEncode({
+            'text': text,
+            'lang': lang,
+          }),
+        );
 
-      if (response.statusCode == 200) {
-        // 保存音频文件
-        final tempDir = await getTemporaryDirectory();
-        final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.mp3');
-        await audioFile.writeAsBytes(response.bodyBytes);
-        return audioFile.path;
-      } else {
-        throw Exception('语音合成请求失败: ${response.statusCode}');
+        print('语音合成API响应状态: ${response.statusCode}');
+        print('语音合成API响应内容: ${response.body}');
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['success'] == true && data['audioUrl'] != null) {
+            // 返回完整的音频URL，避免重复/api
+            String audioUrl = data['audioUrl'];
+            if (audioUrl.startsWith('/api/')) {
+              audioUrl = '${getApiBase()}$audioUrl';
+            } else {
+              audioUrl = '${getApiBaseUrl()}$audioUrl';
+            }
+            print('生成的音频URL: $audioUrl');
+            return audioUrl;
+          } else {
+            throw Exception('语音合成失败: ${data['message'] ?? '未知错误'}');
+          }
+        } else {
+          throw Exception('语音合成请求失败: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('后端语音合成也失败: $e');
+        throw Exception('所有语音合成方式都失败');
       }
     } catch (e) {
       print('语音合成错误: $e');
@@ -132,48 +166,201 @@ class VoiceService {
     }
   }
 
-  /// 播放音频
-  static Future<void> playAudio(String audioFilePath) async {
+  /// Web端浏览器原生语音合成
+  static Future<void> _textToSpeechWeb(String text, String lang) async {
     try {
+      print('使用浏览器原生语音合成: $text');
+      
+      final result = js.context.callMethod('eval', ['''
+        (function() {
+          return new Promise((resolve, reject) => {
+            if (!window.speechSynthesis) {
+              reject('Speech Synthesis not supported');
+              return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance('$text');
+            utterance.lang = '$lang';
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = () => {
+              console.log('Web Speech Synthesis started');
+            };
+            
+            utterance.onend = () => {
+              console.log('Web Speech Synthesis ended');
+              resolve('success');
+            };
+            
+            utterance.onerror = (event) => {
+              console.log('Web Speech Synthesis error:', event.error);
+              reject(event.error);
+            };
+            
+            window.speechSynthesis.speak(utterance);
+          });
+        })();
+      ''']);
+      
+      // 等待语音合成完成
+      await Future.delayed(const Duration(seconds: 2));
+      print('浏览器语音合成完成');
+      
+    } catch (e) {
+      print('浏览器语音合成错误: $e');
+      throw Exception('浏览器语音合成失败: $e');
+    }
+  }
+
+  /// 播放音频
+  static Future<void> playAudio(String audioUrl) async {
+    try {
+      print('开始播放音频: $audioUrl');
       _isPlaying = true;
-      await _audioPlayer.play(DeviceFileSource(audioFilePath));
+      
+      if (kIsWeb) {
+        if (audioUrl == 'browser-native-tts') {
+          // 浏览器原生语音合成，不需要额外播放
+          print('浏览器原生语音合成，无需额外播放');
+        } else {
+          // Web端使用HTML5 Audio API
+          await _playAudioWeb(audioUrl);
+        }
+      } else {
+        // 移动端使用AudioPlayer，添加更多错误处理和重试机制
+        try {
+          // 确保URL是完整的
+          String fullUrl = audioUrl;
+          if (!audioUrl.startsWith('http')) {
+            // 如果是相对路径，添加基础URL
+            fullUrl = '${getApiBase()}$audioUrl';
+          }
+          print('移动端播放完整URL: $fullUrl');
+          
+          // 设置播放源
+          await _audioPlayer.play(UrlSource(fullUrl));
+          
+          // 等待播放开始
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // 检查播放状态
+          final state = _audioPlayer.state;
+          print('音频播放状态: $state');
+          
+          if (state == PlayerState.stopped) {
+            throw Exception('音频播放失败：播放器状态异常');
+          }
+          
+        } catch (e) {
+          print('移动端音频播放失败，尝试备用方案: $e');
+          
+          // 备用方案：尝试不同的播放方式
+          try {
+            await _audioPlayer.stop(); // 先停止
+            await Future.delayed(const Duration(milliseconds: 100));
+            
+            // 重新尝试播放
+            String fullUrl = audioUrl.startsWith('http') ? audioUrl : '${getApiBase()}$audioUrl';
+            await _audioPlayer.play(UrlSource(fullUrl));
+            
+          } catch (e2) {
+            print('备用播放方案也失败: $e2');
+            throw Exception('移动端音频播放失败: $e2');
+          }
+        }
+      }
+      
+      print('音频播放成功');
     } catch (e) {
       print('播放音频错误: $e');
-      throw Exception('音频播放失败');
+      throw Exception('音频播放失败: $e');
     } finally {
       _isPlaying = false;
     }
   }
 
+  /// Web端音频播放
+  static Future<void> _playAudioWeb(String audioUrl) async {
+    try {
+      print('Web端开始播放音频: $audioUrl');
+      
+      // 使用JavaScript直接播放音频，避免Dart-HTML互操作问题
+      final result = js.context.callMethod('eval', ['''
+        (function() {
+          return new Promise((resolve, reject) => {
+            const audio = new Audio('$audioUrl');
+            audio.autoplay = true;
+            audio.controls = false;
+            
+            audio.addEventListener('loadeddata', () => {
+              console.log('Web端音频加载完成');
+            });
+            
+            audio.addEventListener('canplay', () => {
+              console.log('Web端音频可以播放');
+            });
+            
+            audio.addEventListener('play', () => {
+              console.log('Web端音频开始播放');
+            });
+            
+            audio.addEventListener('ended', () => {
+              console.log('Web端音频播放完成');
+              resolve('success');
+            });
+            
+            audio.addEventListener('error', (e) => {
+              console.log('Web端音频播放错误:', e);
+              reject('音频播放失败');
+            });
+            
+            // 设置超时
+            setTimeout(() => {
+              if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
+                console.log('Web端音频播放超时，但已加载');
+                resolve('timeout');
+              } else {
+                reject('音频加载超时');
+              }
+            }, 10000);
+          });
+        })();
+      ''']);
+      
+      print('Web端音频播放完成');
+      
+    } catch (e) {
+      print('Web端音频播放错误: $e');
+      throw Exception('Web端音频播放失败: $e');
+    }
+  }
+
   /// 停止播放
   static Future<void> stopAudio() async {
-    await _audioPlayer.stop();
+    if (kIsWeb) {
+      // Web端停止播放
+      try {
+        // 使用JavaScript停止所有音频
+        js.context.callMethod('eval', ['''
+          (function() {
+            const audioElements = document.querySelectorAll('audio');
+            audioElements.forEach(audio => audio.pause());
+          })();
+        ''']);
+      } catch (e) {
+        print('Web端停止播放错误: $e');
+      }
+    } else {
+      // 移动端停止播放
+      await _audioPlayer.stop();
+    }
     _isPlaying = false;
   }
 
   /// 检查是否正在播放
   static bool get isPlaying => _isPlaying;
-
-  /// 获取百度访问令牌
-  static Future<String> _getBaiduToken() async {
-    try {
-      final url = Uri.parse(
-        'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=$_baiduApiKey&client_secret=$_baiduSecretKey'
-      );
-      
-      final response = await http.post(url).timeout(const Duration(seconds: 10));
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['access_token'];
-      } else {
-        throw Exception('获取百度访问令牌失败');
-      }
-    } catch (e) {
-      print('获取百度令牌错误: $e');
-      throw Exception('无法获取语音服务授权');
-    }
-  }
 
   /// 释放资源
   static Future<void> dispose() async {

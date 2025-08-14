@@ -1,6 +1,12 @@
 import '../models/tourist_spot.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../utils/api_host.dart';
+import 'auth_service.dart';
 
 class TouristSpotService {
+  final String _apiUrl = getApiBaseUrl(path: '/api/amap/poi?keywords=北京中轴线&city=北京&types=风景名胜|文物古迹|博物馆&offset=20');
+
   // 使用真实素材的景点数据
   static final List<TouristSpot> _spots = [
     TouristSpot(
@@ -124,11 +130,91 @@ class TouristSpotService {
     ),
   ];
 
-  // 获取所有景点
+  // 获取所有中轴线景点（批量关键词+高德API图片）
   Future<List<TouristSpot>> getAllSpots() async {
-    // 模拟网络延迟
-    await Future.delayed(const Duration(milliseconds: 100));
-    return _spots;
+    final keywords = [
+      '北京中轴线', '天坛', '故宫', '前门', '永定门', '先农坛', '钟鼓楼', '景山', '什刹海', '北海公园', '地安门', '正阳门', '天安门'
+    ];
+    final Set<String> uniqueIds = {};
+    final List<TouristSpot> allSpots = [];
+    for (final keyword in keywords) {
+      try {
+        final url = getApiBaseUrl(path: '/api/amap/poi?keywords=$keyword&city=北京&types=风景名胜|文物古迹|博物馆&offset=10');
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == '1' && data['pois'] != null) {
+            for (final poi in data['pois']) {
+              final map = _poiToSpotMap(poi);
+              final id = map['id'] ?? '';
+              if (id.isNotEmpty && !uniqueIds.contains(id)) {
+                uniqueIds.add(id);
+                allSpots.add(TouristSpot(
+                  id: map['id'] ?? '',
+                  name: map['name'] ?? '',
+                  nameEn: map['nameEn'] ?? '',
+                  description: map['description'] ?? '',
+                  descriptionEn: map['descriptionEn'] ?? '',
+                  imageUrl: map['imageUrl'] ?? '',
+                  latitude: map['latitude'] ?? 0.0,
+                  longitude: map['longitude'] ?? 0.0,
+                  address: map['address'] ?? '',
+                  addressEn: map['addressEn'] ?? '',
+                  tags: List<String>.from(map['tags'] ?? []),
+                  tagsEn: List<String>.from(map['tagsEn'] ?? []),
+                  rating: map['rating'] ?? 4.0,
+                  reviewCount: map['reviewCount'] ?? 0,
+                  category: map['category'] ?? '',
+                ));
+              }
+            }
+          }
+        }
+        await Future.delayed(const Duration(milliseconds: 100)); // 防止请求过快
+      } catch (e) {
+        print('高德API获取 $keyword 失败: $e');
+        continue;
+      }
+    }
+    return allSpots;
+  }
+
+  // 将高德POI结构转为 TouristSpot 结构
+  Map<String, dynamic> _poiToSpotMap(Map<String, dynamic> poi) {
+    String? location = poi['location'];
+    double? lat;
+    double? lng;
+    if (location != null && location.contains(',')) {
+      final parts = location.split(',');
+      if (parts.length == 2) {
+        lng = double.tryParse(parts[0]);
+        lat = double.tryParse(parts[1]);
+      }
+    }
+    String imageUrl = '';
+    if (poi['photos'] != null && poi['photos'] is List && (poi['photos'] as List).isNotEmpty) {
+      final photo = (poi['photos'] as List).first;
+      if (photo is Map && photo['url'] != null) {
+        imageUrl = photo['url'];
+      }
+    }
+    return {
+      'id': poi['id'] ?? '',
+      'name': poi['name'] ?? '',
+      'nameEn': poi['name'] ?? '',
+      'description': poi['type'] ?? '',
+      'descriptionEn': poi['type'] ?? '',
+      'imageUrl': imageUrl,
+      'latitude': lat,
+      'longitude': lng,
+      'address': poi['address'] ?? '',
+      'addressEn': poi['address'] ?? '',
+      'tags': [poi['type'] ?? ''],
+      'tagsEn': [poi['type'] ?? ''],
+      'rating': 4.0,
+      'reviewCount': 0,
+      'category': poi['type'] ?? '',
+    };
   }
 
   // 根据ID获取景点

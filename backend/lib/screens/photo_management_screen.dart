@@ -26,6 +26,31 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
   final List<String> spots = ['故宫', '天坛', '前门', '钟鼓楼', '什刹海万宁桥', '先农坛', '永定门'];
   final List<String> statuses = ['pending', 'approved', 'rejected'];
 
+  // 示例图片数据（如无审核图片时展示）
+  final List<Map<String, dynamic>> _demoPhotos = [
+    {
+      'path': 'assets/images/tmp/1.jpg',
+      'uploader': 'admin',
+      'spotName': '天坛',
+      'status': 'approved',
+      'title': '天坛美景',
+    },
+    {
+      'path': 'assets/images/tmp/2.jpg',
+      'uploader': 'user',
+      'spotName': '故宫',
+      'status': 'approved',
+      'title': '故宫一角',
+    },
+    {
+      'path': 'assets/images/tmp/3.jpg',
+      'uploader': 'chun',
+      'spotName': '钟鼓楼',
+      'status': 'approved',
+      'title': '钟鼓楼夜色',
+    },
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -40,16 +65,43 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
     });
 
     try {
-      final result = await PhotoService.getPhotos(
+      final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+      
+      final photoService = PhotoService();
+      // 获取照片列表
+      final result = await photoService.getPhotosAdvanced(
         status: selectedStatus,
         spotName: selectedSpot,
         page: currentPage,
         limit: 10,
       );
 
-      final newPhotos = (result['photos'] as List)
+      List<Photo> newPhotos = (result['photos'] as List)
           .map((json) => Photo.fromJson(json))
           .toList();
+
+      // 如果用户已登录且没有选择特定状态，确保用户能看到自己上传的所有照片
+      if (user != null && selectedStatus == null) {
+        // 获取用户上传的所有照片
+        final userResult = await photoService.getPhotosAdvanced(
+          uploader: user.username,
+          limit: 100,
+        );
+        
+        final userPhotos = (userResult['photos'] as List)
+            .map((json) => Photo.fromJson(json))
+            .toList();
+        
+        // 过滤掉已经在当前列表中的照片
+        final existingIds = newPhotos.map((p) => p.id).toSet();
+        final additionalUserPhotos = userPhotos.where((p) => !existingIds.contains(p.id)).toList();
+        
+        // 合并照片列表
+        newPhotos.addAll(additionalUserPhotos);
+        
+        // 按上传时间排序
+        newPhotos.sort((a, b) => b.uploadTime.compareTo(a.uploadTime));
+      }
 
       if (mounted) {
         setState(() {
@@ -117,10 +169,11 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
     final isChinese = Provider.of<LocaleProvider>(context, listen: false).locale == AppLocale.zh;
 
     try {
-      await PhotoService.reviewPhoto(
+      final photoService = PhotoService();
+      await photoService.reviewPhoto(
         photoId: photo.id,
-        status: status,
-        reason: status == 'rejected' ? (isChinese ? '内容不符合要求' : 'Content does not meet requirements') : null,
+        approved: status == 'approved',
+        comment: status == 'rejected' ? (isChinese ? '内容不符合要求' : 'Content does not meet requirements') : null,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,17 +194,17 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isChinese ? '确认删除' : 'Confirm Delete'),
+        title: Text(isChinese ? '确认删除' : 'Confirm Delete', style: const TextStyle(fontFamily: kFontFamilyTitle)),
         content: Text(isChinese ? '确定要删除这张照片吗？' : 'Are you sure you want to delete this photo?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(isChinese ? '取消' : 'Cancel'),
+            child: Text(isChinese ? '取消' : 'Cancel', style: const TextStyle(fontFamily: kFontFamilyTitle)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(isChinese ? '删除' : 'Delete'),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(isChinese ? '删除' : 'Delete', style: const TextStyle(fontFamily: kFontFamilyTitle)),
+            style: TextButton.styleFrom(foregroundColor: kErrorColor),
           ),
         ],
       ),
@@ -159,7 +212,8 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
 
     if (confirmed == true) {
       try {
-        await PhotoService.deletePhoto(photo.id);
+        final photoService = PhotoService();
+        await photoService.deletePhoto(photo.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(isChinese ? '删除成功' : 'Deleted successfully')),
         );
@@ -178,8 +232,8 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isChinese ? '照片管理' : 'Photo Management'),
-        backgroundColor: AppTheme.primaryColor,
+        title: const Text('照片管理', style: TextStyle(fontFamily: kFontFamilyTitle)),
+        backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: Column(
@@ -272,24 +326,24 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
                           child: Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              color: Colors.grey[200],
+                              color: kLightGrey,
                               borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(8),
+                                top: Radius.circular(kBorderRadius),
                               ),
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(8),
+                                top: Radius.circular(kBorderRadius),
                               ),
                               child: Image.network(
-                                PhotoService.getPhotoUrl(photo.path),
+                                PhotoService().getPhotoUrl(photo.path),
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Center(
                                     child: Icon(
                                       Icons.image_not_supported,
                                       size: 48,
-                                      color: Colors.grey,
+                                      color: kGrey,
                                     ),
                                   );
                                 },
@@ -322,7 +376,7 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: _getStatusColor(photo.status),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(kBorderRadius),
                                     ),
                                     child: Text(
                                       _getStatusText(photo.status),
@@ -351,12 +405,12 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
                             child: Row(
                               children: [
                                 // 审核按钮（只有导游可以看到，且只对待审核照片显示）
-                                if (photo.isPending && Provider.of<AuthProvider>(context, listen: false).currentUser?.role == 'guide') ...[
+                                if (photo.isPending && Provider.of<AuthProvider>(context, listen: false).currentUser?.isGuide == true) ...[
                                   Expanded(
                                     child: ElevatedButton(
                                       onPressed: () => _reviewPhoto(photo, 'approved'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.green,
+                                        backgroundColor: kSuccessColor,
                                         foregroundColor: Colors.white,
                                       ),
                                       child: Text(isChinese ? '通过' : 'Approve'),
@@ -367,7 +421,7 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
                                     child: ElevatedButton(
                                       onPressed: () => _reviewPhoto(photo, 'rejected'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
+                                        backgroundColor: kErrorColor,
                                         foregroundColor: Colors.white,
                                       ),
                                       child: Text(isChinese ? '拒绝' : 'Reject'),
@@ -379,7 +433,7 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
                                 if (_canDeletePhoto(photo))
                                   IconButton(
                                     onPressed: () => _deletePhoto(photo),
-                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    icon: Icon(Icons.delete, color: kErrorColor),
                                     tooltip: isChinese ? '删除' : 'Delete',
                                   ),
                               ],
@@ -396,7 +450,7 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _uploadPhotos,
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: kPrimaryColor,
         child: Icon(Icons.add_a_photo, color: Colors.white),
         tooltip: isChinese ? '上传照片' : 'Upload Photos',
       ),
@@ -424,7 +478,7 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
     if (user == null) return false;
 
     // 导游可以删除所有照片
-    if (user.role == 'guide') return true;
+    if (user.isGuide) return true;
 
     // 用户只能删除自己上传的照片
     return photo.uploader == user.username;
@@ -433,13 +487,13 @@ class _PhotoManagementScreenState extends State<PhotoManagementScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'pending':
-        return Colors.orange;
+        return kWarningColor;
       case 'approved':
-        return Colors.green;
+        return kSuccessColor;
       case 'rejected':
-        return Colors.red;
+        return kErrorColor;
       default:
-        return Colors.grey;
+        return kGrey;
     }
   }
 
@@ -476,14 +530,14 @@ class _UploadDialogState extends State<_UploadDialog> {
     final isChinese = Provider.of<LocaleProvider>(context).locale == AppLocale.zh;
 
     return AlertDialog(
-      title: Text(isChinese ? '上传照片' : 'Upload Photos'),
+      title: Text(isChinese ? '上传照片' : 'Upload Photos', style: const TextStyle(fontFamily: kFontFamilyTitle)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(isChinese
               ? '选择了 ${widget.platformFiles.length} 张照片'
-              : 'Selected ${widget.platformFiles.length} photos'),
+              : 'Selected ${widget.platformFiles.length} photos', style: const TextStyle(fontFamily: kFontFamilyTitle)),
             SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: selectedSpot,
@@ -524,7 +578,7 @@ class _UploadDialogState extends State<_UploadDialog> {
       actions: [
         TextButton(
           onPressed: isUploading ? null : () => Navigator.pop(context),
-          child: Text(isChinese ? '取消' : 'Cancel'),
+          child: Text(isChinese ? '取消' : 'Cancel', style: const TextStyle(fontFamily: kFontFamilyTitle)),
         ),
         ElevatedButton(
           onPressed: isUploading || selectedSpot == null
@@ -536,7 +590,7 @@ class _UploadDialogState extends State<_UploadDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(isChinese ? '上传' : 'Upload'),
+              : Text(isChinese ? '上传' : 'Upload', style: const TextStyle(fontFamily: kFontFamilyTitle)),
         ),
       ],
     );
@@ -550,7 +604,8 @@ class _UploadDialogState extends State<_UploadDialog> {
     });
 
     try {
-      await PhotoService.uploadPhotosFromBytes(
+      final photoService = PhotoService();
+      await photoService.uploadPhotosFromBytes(
         files: widget.platformFiles,
         spotName: selectedSpot!,
         user: widget.user,
@@ -558,14 +613,16 @@ class _UploadDialogState extends State<_UploadDialog> {
         description: descriptionController.text.isNotEmpty ? descriptionController.text : null,
       );
 
+      final isChinese = Provider.of<LocaleProvider>(context, listen: false).locale == AppLocale.zh;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('上传成功')),
+        SnackBar(content: Text(isChinese ? '上传成功' : 'Upload successful')),
       );
 
       widget.onUploadComplete();
     } catch (e) {
+      final isChinese = Provider.of<LocaleProvider>(context, listen: false).locale == AppLocale.zh;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('上传失败: $e')),
+        SnackBar(content: Text(isChinese ? '上传失败: $e' : 'Upload failed: $e')),
       );
     } finally {
       setState(() {

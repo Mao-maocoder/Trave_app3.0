@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../providers/locale_provider.dart';
 import '../widgets/optimized_card.dart';
+import '../services/food_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CultureScreen extends StatefulWidget {
   const CultureScreen({Key? key}) : super(key: key);
@@ -116,7 +118,8 @@ class _CultureScreenState extends State<CultureScreen> {
         
         return Scaffold(
           appBar: AppBar(
-            title: Text(isChinese ? '文化探索' : 'Cultural Exploration'),
+            title: Text(isChinese ? '文化探索' : 'Cultural Exploration',
+                style: const TextStyle(fontFamily: kFontFamilyTitle)),
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
@@ -128,8 +131,8 @@ class _CultureScreenState extends State<CultureScreen> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: kAccentColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(kRadiusButton),
                   ),
                   child: const Icon(Icons.language, size: 20),
                 ),
@@ -139,106 +142,228 @@ class _CultureScreenState extends State<CultureScreen> {
             ],
           ),
           body: SafeArea(
-            child: Column(
-              children: [
-                // 头部介绍
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(kSpaceL),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue.shade400, Colors.purple.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(kRadiusXl),
-                      bottomRight: Radius.circular(kRadiusXl),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.menu_book_outlined,
-                        color: Colors.white,
-                        size: 32,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 头部介绍
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(kSpaceL),
+                    decoration: BoxDecoration(
+                      gradient: kPrimaryGradient,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(kRadiusXl),
+                        bottomRight: Radius.circular(kRadiusXl),
                       ),
-                      const SizedBox(height: kSpaceM),
-                      Text(
-                        isChinese ? '中轴线文化探索' : 'Central Axis Cultural Exploration',
-                        style: const TextStyle(
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.menu_book_outlined,
                           color: Colors.white,
-                          fontSize: kFontSizeXxl,
-                          fontWeight: FontWeight.bold,
+                          size: 32,
                         ),
-                      ),
-                      const SizedBox(height: kSpaceS),
-                      Text(
-                        isChinese ? '深入了解古都文化的精髓' : 'Deep understanding of the essence of ancient capital culture',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: kFontSizeM,
+                        const SizedBox(height: kSpaceM),
+                        Text(
+                          isChinese ? '中轴线文化探索' : 'Central Axis Cultural Exploration',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: kFontSizeXxl,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: kFontFamilyTitle,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: kSpaceS),
+                        Text(
+                          isChinese ? '深入了解古都文化的精髓' : 'Deep understanding of the essence of ancient capital culture',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: kFontSizeM,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          icon: Icon(Icons.qr_code_scanner),
+                          label: Text(isChinese ? '食材溯源' : 'Food Trace', style: const TextStyle(fontFamily: kFontFamilyTitle)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kSecondaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            String? foodName;
+                            String? story;
+                            await showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text(isChinese ? '输入菜品名' : 'Enter Food Name', style: const TextStyle(fontFamily: kFontFamilyTitle)),
+                                content: TextField(
+                                  autofocus: true,
+                                  decoration: InputDecoration(hintText: isChinese ? '如：藜麦' : 'e.g. Quinoa'),
+                                  onChanged: (v) => foodName = v,
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(isChinese ? '取消' : 'Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      if (foodName != null && foodName!.isNotEmpty) {
+                                        story = await FoodService.traceFood(foodName!);
+                                      }
+                                      Navigator.pop(context);
+                                      if (story != null) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text(isChinese ? '溯源故事' : 'Food Story'),
+                                            content: Text(story ?? ''),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(context),
+                                                child: Text(isChinese ? '关闭' : 'Close'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Text(isChinese ? '查询' : 'Search'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                
-                // 分类标签
-                Container(
-                  height: 80,
-                  padding: const EdgeInsets.symmetric(horizontal: kSpaceM),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final isSelected = _selectedCategory == index;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedCategory = index;
-                          });
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(right: kSpaceM, top: kSpaceL),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: kSpaceL,
-                            vertical: kSpaceM,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : AppColors.surface,
-                            borderRadius: BorderRadius.circular(kRadiusXl),
-                            boxShadow: isSelected ? kShadowMedium : kShadowLight,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _categories[index],
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.textPrimary,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                fontSize: kFontSizeM,
+                  // 分类标签
+                  Container(
+                    height: 80,
+                    padding: const EdgeInsets.symmetric(horizontal: kSpaceM),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _categories.length,
+                      itemBuilder: (context, index) {
+                        final isSelected = _selectedCategory == index;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedCategory = index;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: kSpaceM, top: kSpaceL),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: kSpaceL,
+                              vertical: kSpaceM,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected ? kPrimaryColor : kSurfaceColor,
+                              borderRadius: BorderRadius.circular(kRadiusXl),
+                              boxShadow: isSelected ? kShadowMedium : kShadowLight,
+                            ),
+                            child: Center(
+                              child: Text(
+                                _categories[index],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : kTextPrimaryColor,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  fontSize: kFontSizeM,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-                
-                // 文化内容列表
-                Expanded(
-                  child: ListView.builder(
+                  // 文化内容列表
+                  Padding(
                     padding: const EdgeInsets.all(kSpaceM),
-                    itemCount: _filteredItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _filteredItems[index];
-                      return _buildCultureCard(item, isChinese);
-                    },
+                    child: Column(
+                      children: _filteredItems
+                          .map((item) => _buildCultureCard(item, isChinese))
+                          .toList(),
+                    ),
                   ),
-                ),
-              ],
+                  // 戏楼板块
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        isChinese ? '戏楼 · 中轴线多媒体' : 'Theater · Central Axis Multimedia',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: kFontFamilyTitle,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildVideoCard(
+                        context,
+                        isChinese ? 'AI春晚非遗大作《中轴线》' : 'AI Spring Festival Gala: Central Axis',
+                        'Bilibili',
+                        'https://www.bilibili.com/video/BV1j8Fue5Erw/?vd_source=3410c0f2b19cd75c4eccc1f1102e2f8c',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '单弦《诗情画意赞中轴》' : 'Danxian: Ode to the Central Axis',
+                        'Bilibili',
+                        'https://www.bilibili.com/video/BV1NS42197G2/?vd_source=3410c0f2b19cd75c4eccc1f1102e2f8c',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '北京中轴龙脉之钟' : 'Beijing Central Axis Dragon Vein Bell',
+                        'Bilibili',
+                        'https://www.bilibili.com/video/BV1FiDUY3EoB/?vd_source=3410c0f2b19cd75c4eccc1f1102e2f8c',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '《登场了！北京中轴线》' : 'Here Comes! Beijing Central Axis',
+                        '百度好看',
+                        'https://haokan.baidu.com/v?pd=wisenatural&vid=6763549125120068849',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '《北京中轴线》' : 'Beijing Central Axis',
+                        'Bilibili',
+                        'https://www.bilibili.com/video/BV1Jw4m1Y7EU/?vd_source=3410c0f2b19cd75c4eccc1f1102e2f8c',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '曲艺联唱《北京中轴线》' : 'Quyi Medley: Beijing Central Axis',
+                        'CCTV',
+                        'https://caiyi.cctv.com/2025/01/29/VIDEHnm6F08FYa7tQxb5fV4V250129.shtml',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '舞蹈《镇水神兽》' : 'Dance: Water Guardian Beast',
+                        '百度好看',
+                        'https://haokan.baidu.com/v?pd=wisenatural&vid=13782222974100361441',
+                      ),
+                      _buildVideoCard(
+                        context,
+                        isChinese ? '中轴线情书' : 'Central Axis Love Letter',
+                        'Bilibili',
+                        'https://www.bilibili.com/video/BV1F5DoYtERo/?vd_source=3410c0f2b19cd75c4eccc1f1102e2f8c',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         );
@@ -250,7 +375,7 @@ class _CultureScreenState extends State<CultureScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: kSpaceL),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: kSurfaceColor,
         borderRadius: BorderRadius.circular(kRadiusL),
         boxShadow: kShadowMedium,
       ),
@@ -286,7 +411,7 @@ class _CultureScreenState extends State<CultureScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: kPrimaryColor,
                       borderRadius: BorderRadius.circular(kRadiusS),
                     ),
                     child: Text(
@@ -344,7 +469,7 @@ class _CultureScreenState extends State<CultureScreen> {
                 Text(
                   isChinese ? item['description'] : item['descriptionEn'],
                   style: const TextStyle(
-                    color: AppColors.textLight,
+                    color: kTextLightColor,
                     fontSize: kFontSizeM,
                   ),
                   maxLines: 3,
@@ -365,7 +490,7 @@ class _CultureScreenState extends State<CultureScreen> {
                         maxLines: 1,
                       ),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
+                        side: const BorderSide(color: kPrimaryColor),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(kRadiusM),
                         ),
@@ -383,7 +508,7 @@ class _CultureScreenState extends State<CultureScreen> {
                         maxLines: 1,
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: kPrimaryColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(kRadiusM),
@@ -409,7 +534,7 @@ class _CultureScreenState extends State<CultureScreen> {
               ? '正在加载《${item['title']}》...'
               : 'Loading "${item['titleEn']}"...',
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: kPrimaryColor,
       ),
     );
   }
@@ -422,8 +547,30 @@ class _CultureScreenState extends State<CultureScreen> {
               ? '分享《${item['title']}》'
               : 'Share "${item['titleEn']}"',
         ),
-        backgroundColor: AppColors.success,
+        backgroundColor: kSuccessColor,
       ),
     );
   }
+} 
+
+Widget _buildVideoCard(BuildContext context, String title, String platform, String url) {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+    child: ListTile(
+      leading: Icon(Icons.ondemand_video, color: Colors.blueAccent),
+      title: Text(title),
+      subtitle: Text(platform),
+      trailing: Icon(Icons.open_in_new),
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('无法打开链接')),
+          );
+        }
+      },
+    ),
+  );
 } 

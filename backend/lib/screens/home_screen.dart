@@ -1,2438 +1,1362 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/locale_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
+import '../providers/locale_provider.dart';
 import '../constants.dart';
-import '../theme.dart';
-import '../utils/performance_config.dart';
-import '../widgets/primary_button.dart';
 import '../models/user.dart';
-import '../services/user_service.dart';
-import 'ai_assistant_screen.dart';
-import 'admin_dashboard_screen.dart';
+import 'search_screen.dart';
+import 'map_screen.dart';
+import 'dart:math' as math;
+import '../widgets/optimized_image.dart';
+import '../utils/image_preloader.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
+// 叶子动画类
+class LeafAnimation {
+  final int id;
+  final double startX;
+  final Duration delay;
+  final Duration duration;
+  
+  LeafAnimation({
+    required this.id,
+    required this.startX,
+    required this.delay,
+    required this.duration,
+  });
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  int _currentIndex = 0;
+  int _currentBannerIndex = 0;
+  late PageController _bannerController;
+  late PageController _exhibitionPageController;
+  late AnimationController _leafAnimationController;
+  late List<LeafAnimation> _leaves;
+  int _currentExhibitionPage = 0;
+  
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    _bannerController = PageController();
+    _exhibitionPageController = PageController();
+    _leafAnimationController = AnimationController(
+      duration: const Duration(seconds: 8), // 增加动画周期
       vsync: this,
     );
+    _initializeLeaves();
+    _startAutoPlay();
+    _startLeafAnimation();
+    _preloadImages();
+  }
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
+  void _preloadImages() {
+    // 预加载轮播图图片
+    final bannerImages = _banners.map((banner) => banner['image'] as String).toList();
+    ImagePreloader.preloadImages(bannerImages);
+    
+    // 预加载展览图片
+    final exhibitionImages = [
+      'assets/images/spots/故宫.png',
+      'assets/images/spots/天坛.png',
+      'assets/images/spots/钟鼓楼.png',
+      'assets/images/spots/前门.png',
+      'assets/images/spots/永定门.png',
+      'assets/images/spots/先农坛.png',
+      'assets/images/spots/什刹海万宁桥.png',
+    ];
+    ImagePreloader.preloadImages(exhibitionImages);
+  }
+
+  void _initializeLeaves() {
+    _leaves = List.generate(6, (index) => LeafAnimation(
+      id: index,
+      startX: math.Random().nextDouble() * 250 + 75,
+      delay: Duration(milliseconds: index * 800), // 增加延迟间隔
+      duration: Duration(seconds: 4 + math.Random().nextInt(3)), // 增加下落时间
     ));
+  }
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+  void _startLeafAnimation() {
+    _leafAnimationController.repeat();
+  }
 
-    _animationController.forward();
+  // 轮播图数据
+  final List<Map<String, dynamic>> _banners = [
+    {
+      'title': '中轴奇遇',
+      'subtitle': '探索北京中轴线的文化魅力',
+      'image': 'assets/images/spots/故宫.png',
+      'tag': '文化体验',
+    },
+    {
+      'title': '天坛祈年殿',
+      'subtitle': '感受古代皇家祭祀文化',
+      'image': 'assets/images/spots/天坛.png',
+      'tag': '历史古迹',
+    },
+    {
+      'title': '钟鼓楼',
+      'subtitle': '聆听古都的时光回响',
+      'image': 'assets/images/spots/钟鼓楼.png',
+      'tag': '文化地标',
+    },
+    {
+      'title': '前门大街',
+      'subtitle': '体验老北京风情',
+      'image': 'assets/images/spots/前门.png',
+      'tag': '民俗文化',
+    },
+    {
+      'title': '永定门',
+      'subtitle': '中轴线的南起点',
+      'image': 'assets/images/spots/永定门.png',
+      'tag': '历史地标',
+    },
+  ];
+
+  void _startAutoPlay() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        if (_currentBannerIndex < _banners.length - 1) {
+          _currentBannerIndex++;
+        } else {
+          _currentBannerIndex = 0;
+        }
+        _bannerController.animateToPage(
+          _currentBannerIndex,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+        _startAutoPlay();
+      }
+    });
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _bannerController.dispose();
+    _exhibitionPageController.dispose();
+    _leafAnimationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final localeProvider = Provider.of<LocaleProvider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
-    final isChinese = localeProvider.locale == AppLocale.zh;
+    final localeProvider = Provider.of<LocaleProvider>(context);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              // 自定义AppBar
-              SliverAppBar(
-                expandedHeight: 200.0,
-                floating: false,
-                pinned: true,
-                backgroundColor: AppColors.primary,
-                flexibleSpace: FlexibleSpaceBar(
-                  title: Text(
-                    isChinese ? '北京中轴线' : 'Beijing Central Axis',
+      backgroundColor: kBackgroundColor,
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: kPrimaryColor,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, size: 40, color: kPrimaryColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    authProvider.currentUser?.username ?? '',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
                     ),
                   ),
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.primary,
-                          AppColors.secondary,
+                  Text(
+                    authProvider.currentUser?.email ?? '',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (authProvider.currentUser?.isGuide == true)
+              ListTile(
+                leading: const Icon(Icons.dashboard),
+                title: Text(
+                  localeProvider.locale == AppLocale.zh ? '导游管理面板' : 'Guide Dashboard',
+                ),
+                onTap: () {
+                  Navigator.pop(context); // 关闭抽屉
+                  Navigator.pushNamed(context, '/guide_dashboard');
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: Text(
+                localeProvider.locale == AppLocale.zh ? '设置' : 'Settings',
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
+        ),
+      ),
+      appBar: AppBar(
+        title: const Text('中轴奇遇', style: TextStyle(color: kPrimaryColor)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.pushNamed(context, '/search'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              authProvider.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+            },
+          ),
+        ],
+      ),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: kPrimaryColor,
+        unselectedItemColor: kTextSecondary,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: '推荐',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: '游中轴',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.photo_library),
+            label: '看景点',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: '我的',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return _buildHomeContent();
+      case 1:
+        return _buildMapContent();
+      case 2:
+        return _buildSpotsContent();
+      case 3:
+        return _buildProfileContent();
+      default:
+        return _buildHomeContent();
+    }
+  }
+
+  Widget _buildHomeContent() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // 轮播图区域
+          _buildBannerSection(),
+          
+          // 今日信息卡片
+          _buildTodayInfoSection(),
+          
+          // 功能图标网格
+          _buildFeatureGrid(),
+          
+          // 中轴展览
+          _buildExhibitionsSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerSection() {
+    return Container(
+      height: 300,
+      child: Stack(
+        children: [
+          // 轮播图
+          PageView.builder(
+            controller: _bannerController,
+            physics: const BouncingScrollPhysics(),
+            onPageChanged: (index) {
+              setState(() {
+                _currentBannerIndex = index;
+              });
+            },
+            itemCount: _banners.length,
+            itemBuilder: (context, index) {
+              final banner = _banners[index];
+              return Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    children: [
+                      // 背景图片
+                      Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: Image.asset(
+                          banner['image'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: kPrimaryColor.withOpacity(0.3),
+                              child: const Icon(
+                                Icons.image,
+                                size: 80,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // 渐变遮罩
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // 内容
+                      Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                banner['tag'],
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              banner['title'],
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              banner['subtitle'],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xE6FFFFFF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          // 轮播指示器
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0x80000000),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentBannerIndex + 1}/${_banners.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodayInfoSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none, // 允许子元素超出边界
+          children: [
+            // 叶子动画效果
+            ..._leaves.map((leaf) => _buildLeafAnimation(leaf)),
+            // 背景装饰图片 - 让房子更完整显示
+            Positioned(
+              top: -15, // 稍微露出房顶
+              right: 0,
+              child: Image.asset(
+                'assets/images/background/icon_bg.png',
+                width: 90,
+                height: 90,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(45),
+                    ),
+                    child: const Icon(
+                      Icons.location_city,
+                      color: kPrimaryColor,
+                      size: 45,
+                    ),
+                  );
+                },
+              ),
+            ),
+            // 内容区域
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 今日开放标题
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: kPrimaryColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        '今日开放',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: kPrimaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 实时时间显示 - 简洁无框设计
+                  StreamBuilder<DateTime>(
+                    stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+                    builder: (context, snapshot) {
+                      final now = snapshot.data ?? DateTime.now();
+                      return Text(
+                        '${now.month}月${now.day}日',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // 两个功能卡片
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildInfoCard(
+                          title: '路线规划',
+                          subtitle: '提前了解行程安排',
+                          icon: Icons.route,
+                          color: Colors.red,
+                          onTap: () => Navigator.pushNamed(context, '/itinerary'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildInfoCard(
+                          title: '地图导览',
+                          subtitle: '智能路线推荐',
+                          icon: Icons.map,
+                          color: kPrimaryColor,
+                          onTap: () => Navigator.pushNamed(context, '/map'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 叶子动画组件
+  Widget _buildLeafAnimation(LeafAnimation leaf) {
+    return AnimatedBuilder(
+      animation: _leafAnimationController,
+      builder: (context, child) {
+        final animation = Tween<double>(
+          begin: 0.0,
+          end: 1.0,
+        ).animate(CurvedAnimation(
+          parent: _leafAnimationController,
+          curve: Interval(
+            (leaf.delay.inMilliseconds / 8000).clamp(0.0, 1.0),
+            ((leaf.delay.inMilliseconds + leaf.duration.inMilliseconds) / 8000).clamp(0.0, 1.0),
+            curve: Curves.easeInOut,
+          ),
+        ));
+
+        final progress = animation.value;
+        final y = progress * 150; // 减少下落距离
+        final opacity = progress < 0.3 ? progress * 3.33 : (progress > 0.7 ? (1 - progress) * 3.33 : 1.0); // 优化渐变效果
+        final rotation = progress * 180; // 减少旋转角度
+        final sway = math.sin(progress * math.pi * 2) * 10; // 添加摇摆效果
+
+        // 只在上半部分显示叶子，不遮挡下面的卡片
+        if (y > 80) return const SizedBox.shrink();
+
+        return Positioned(
+          left: leaf.startX + sway, // 添加摇摆
+          top: y - 15, // 从框外开始
+          child: Transform.rotate(
+            angle: rotation * math.pi / 180,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                width: 16,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.green[600]!.withOpacity(0.8),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                    bottomLeft: Radius.circular(2),
+                    bottomRight: Radius.circular(2),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // 叶脉
+                    Positioned(
+                      left: 8,
+                      top: 2,
+                      child: Container(
+                        width: 1,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.green[800]!.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                    // 叶脉分支
+                    Positioned(
+                      left: 6,
+                      top: 6,
+                      child: Container(
+                        width: 4,
+                        height: 1,
+                        decoration: BoxDecoration(
+                          color: Colors.green[800]!.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 6,
+                      top: 10,
+                      child: Container(
+                        width: 3,
+                        height: 1,
+                        decoration: BoxDecoration(
+                          color: Colors.green[800]!.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 6,
+                      top: 14,
+                      child: Container(
+                        width: 2,
+                        height: 1,
+                        decoration: BoxDecoration(
+                          color: Colors.green[800]!.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: kTextSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureGrid() {
+    final features = [
+      {'icon': Icons.music_note, 'title': '《中轴》音乐', 'route': '/music'},
+      {'icon': Icons.translate, 'title': '智能翻译', 'route': '/translation'},
+      {'icon': Icons.photo_library, 'title': '照片墙', 'route': '/photo'},
+      {'icon': Icons.smart_toy, 'title': 'AI助手', 'route': '/ai_assistant'},
+      {'icon': Icons.mic, 'title': '语音导览', 'route': '/voice'},
+      {'icon': Icons.museum, 'title': '戏楼', 'route': '/culture'},
+      {'icon': Icons.feedback, 'title': '意见反馈', 'route': '/feedback'},
+      {'icon': Icons.card_giftcard, 'title': '积分奖励', 'route': '/rewards'},
+              {'icon': Icons.book, 'title': '北京中轴线术语库', 'route': '/terminology'},
+      {'icon': Icons.map, 'title': '数字中轴', 'route': '/digital-axis', 'url': 'https://bjaxiscloud.com.cn/'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '功能服务',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kPrimaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 5,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.8,
+            ),
+            itemCount: features.length,
+            itemBuilder: (context, index) {
+              final feature = features[index];
+              return GestureDetector(
+                onTap: () async {
+                  // 如果有URL，打开外部链接
+                  if (feature['url'] != null) {
+                    final url = feature['url'] as String;
+                    if (await canLaunchUrl(Uri.parse(url))) {
+                      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('无法打开链接')),
+                      );
+                    }
+                  } else {
+                    // 否则进行内部导航
+                    Navigator.pushNamed(context, feature['route'] as String);
+                  }
+                },
+                child: Column(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: kPrimaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        feature['icon'] as IconData,
+                        color: kPrimaryColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      feature['title'] as String,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExhibitionsSection() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '中轴展览',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: kPrimaryColor,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/exhibitions');
+                },
+                child: const Text('全部 >'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 添加滚动提示
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.swipe_left, size: 16, color: Colors.grey[600]),
+                const SizedBox(width: 4),
+                Text(
+                  '左右滑动查看更多展览',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+          // 页码指示器
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${_currentExhibitionPage + 1} / 7',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 120,
+            child: PageView.builder(
+              controller: _exhibitionPageController,
+              scrollDirection: Axis.horizontal,
+              itemCount: 7,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentExhibitionPage = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                final exhibitions = [
+                  {'title': '故宫博物院', 'subtitle': '紫禁城的秘密', 'image': 'assets/images/spots/故宫.png'},
+                  {'title': '天坛公园', 'subtitle': '祈年殿的传说', 'image': 'assets/images/spots/天坛.png'},
+                  {'title': '钟鼓楼', 'subtitle': '古都时光', 'image': 'assets/images/spots/钟鼓楼.png'},
+                  {'title': '前门大街', 'subtitle': '老北京风情', 'image': 'assets/images/spots/前门.png'},
+                  {'title': '永定门', 'subtitle': '中轴南起点', 'image': 'assets/images/spots/永定门.png'},
+                  {'title': '先农坛', 'subtitle': '古代祭祀文化', 'image': 'assets/images/spots/先农坛.png'},
+                  {'title': '什刹海', 'subtitle': '古都水乡', 'image': 'assets/images/spots/什刹海万宁桥.png'},
+                ];
+                final exhibition = exhibitions[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: _buildExhibitionCard(exhibition['title']!, exhibition['subtitle']!, exhibition['image']!),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExhibitionCard(String title, String subtitle, String image) {
+    return Container(
+      width: 200,
+      margin: const EdgeInsets.only(right: 16),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                child: Image.asset(
+                  image,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: kPrimaryColor.withOpacity(0.3),
+                      child: const Icon(Icons.image, color: Colors.white),
+                    );
+                  },
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.8),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 12,
+                left: 12,
+                right: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 添加一个透明的点击区域
+              Positioned.fill(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      // 根据标题导航到对应的景点详情页面
+                      switch (title) {
+                        case '故宫博物院':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'gugong'});
+                          break;
+                        case '天坛公园':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'tiantan'});
+                          break;
+                        case '钟鼓楼':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'zhonggulou'});
+                          break;
+                        case '前门大街':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'qianmen'});
+                          break;
+                        case '永定门':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'yongdingmen'});
+                          break;
+                        case '先农坛':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'xiannongtan'});
+                          break;
+                        case '什刹海':
+                          Navigator.pushNamed(context, '/spot_detail', arguments: {'spotId': 'shichahai'});
+                          break;
+                        default:
+                          Navigator.pushNamed(context, '/search');
+                      }
+                    },
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapContent() {
+    return const MapScreen();
+  }
+
+  Widget _buildSpotsContent() {
+    return const SearchScreen();
+  }
+
+  Widget _buildProfileContent() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.currentUser;
+
+    return Column(
+      children: [
+        // 顶部装饰背景区域
+        Container(
+          height: 200,
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/background/bg6.png'),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: Stack(
+            children: [
+              // 装饰性背景图案
+              Positioned(
+                top: 20,
+                right: 20,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 40,
+                left: 30,
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+              ),
+              // 用户信息
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white,
+                      child: Text(
+                        user?.username?.substring(0, 1).toUpperCase() ?? 'U',
+                        style: TextStyle(
+                          fontSize: 28,
+                          color: kPrimaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user?.username ?? '用户',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              user?.role == UserRole.guide ? '导游' : '游客',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: -50,
-                          right: -50,
-                          child: Container(
-                            width: 150,
-                            height: 150,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: -30,
-                          left: -30,
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.location_city,
-                                size: 60,
-                                color: Colors.white,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // 主要内容区域
+        Expanded(
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  // 用户功能区域
+                  _buildProfileSection(
+                    title: '我的服务',
+                    items: [
+                      {
+                        'icon': Icons.favorite,
+                        'title': '收藏景点',
+                        'subtitle': '查看您收藏的景点',
+                        'onTap': () => Navigator.pushNamed(context, '/favorites'),
+                      },
+                      {
+                        'icon': Icons.history,
+                        'title': '浏览历史',
+                        'subtitle': '查看您的浏览记录',
+                        'onTap': () => Navigator.pushNamed(context, '/browsing-history'),
+                      },
+                      {
+                        'icon': Icons.edit,
+                        'title': '编辑资料',
+                        'subtitle': '修改个人信息',
+                        'onTap': () => Navigator.pushNamed(context, '/profile-edit'),
+                      },
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // 系统功能区域
+                  _buildProfileSection(
+                    title: '系统设置',
+                    items: [
+                      {
+                        'icon': Icons.settings,
+                        'title': '设置',
+                        'subtitle': '应用设置与偏好',
+                        'onTap': () => Navigator.pushNamed(context, '/settings'),
+                      },
+                      {
+                        'icon': Icons.help_outline,
+                        'title': '帮助',
+                        'subtitle': '使用帮助与反馈',
+                        'onTap': () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('使用帮助'),
+                              content: const Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('中轴奇遇使用指南：'),
+                                  SizedBox(height: 8),
+                                  Text('• 首页：浏览景点和功能'),
+                                  Text('• 地图：查看景点位置'),
+                                  Text('• 搜索：查找特定景点'),
+                                  Text('• 行程：规划您的旅程'),
+                                  Text('• 我的：管理个人信息'),
+                                ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                isChinese ? '中秘文明互鉴' : 'Cultural Exchange',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w300,
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('知道了'),
                                 ),
+                              ],
+                            ),
+                          );
+                        },
+                      },
+                      {
+                        'icon': Icons.info_outline,
+                        'title': '关于',
+                        'subtitle': '应用信息与版本',
+                        'onTap': () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('关于中轴奇遇'),
+                              content: const Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('版本：1.0.0'),
+                                  SizedBox(height: 8),
+                                  Text('中轴奇遇是一款专为北京中轴线文化旅游设计的应用。'),
+                                  SizedBox(height: 8),
+                                  Text('功能特色：'),
+                                  Text('• 景点介绍与导航'),
+                                  Text('• 智能AI助手'),
+                                  Text('• 多语言翻译'),
+                                  Text('• 北京中轴线术语库'),
+                                  Text('• 文化体验'),
+                                ],
                               ),
-                            ],
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('关闭'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      },
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  // 底部信息
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '由中轴奇遇团队开发',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '北京中轴线文化旅游应用',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                actions: [
-                  IconButton(
-                    icon: Icon(
-                      localeProvider.locale == AppLocale.zh
-                          ? Icons.language
-                          : Icons.translate,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      localeProvider.toggleLocale();
-                    },
-                  ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, color: Colors.white),
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'logout':
-                          authProvider.logout();
-                          break;
-                        case 'feedback':
-                          Navigator.pushNamed(context, '/feedback');
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'feedback',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.feedback),
-                            const SizedBox(width: 8),
-                            Text(isChinese ? '意见反馈' : 'Feedback'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'logout',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.logout),
-                            const SizedBox(width: 8),
-                            Text(isChinese ? '退出登录' : 'Logout'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              
-              // 主要内容
-              SliverToBoxAdapter(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 欢迎信息
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.accent, AppColors.secondary],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.accent.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isChinese ? '欢迎回来！' : 'Welcome back!',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  isChinese 
-                                    ? '探索北京中轴线的文化魅力'
-                                    : 'Explore the cultural charm of Beijing Central Axis',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w300,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // 角色区分
-                          if (authProvider.isGuide) ...[
-                            // 导游：显示管理功能区域
-                            Text(
-                              isChinese ? '导游管理面板' : 'Guide Management Panel',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // 管理功能网格
-                            GridView.count(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 1.2,
-                              children: [
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.dashboard,
-                                  title: isChinese ? '数据统计' : 'Statistics',
-                                  subtitle: isChinese ? '查看调查数据' : 'View survey data',
-                                  color: AppColors.primary,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => AdminDashboardScreen()),
-                                  ),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.people,
-                                  title: isChinese ? '用户管理' : 'User Management',
-                                  subtitle: isChinese ? '管理游客账号' : 'Manage tourist accounts',
-                                  color: AppColors.secondary,
-                                  onTap: () => _showUserManagement(context, isChinese),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.content_paste,
-                                  title: isChinese ? '内容管理' : 'Content Management',
-                                  subtitle: isChinese ? '管理景点信息' : 'Manage spot info',
-                                  color: AppColors.accent,
-                                  onTap: () => _showContentManagement(context, isChinese),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.analytics,
-                                  title: isChinese ? '反馈分析' : 'Feedback Analysis',
-                                  subtitle: isChinese ? '查看用户反馈' : 'View user feedback',
-                                  color: AppColors.success,
-                                  onTap: () => _showFeedbackAnalysis(context, isChinese),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.photo_library,
-                                  title: isChinese ? '照片管理' : 'Photo Management',
-                                  subtitle: isChinese ? '管理景点照片' : 'Manage spot photos',
-                                  color: AppColors.accent,
-                                  onTap: () => _showPhotoManagement(context, isChinese),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.settings,
-                                  title: isChinese ? '系统设置' : 'System Settings',
-                                  subtitle: isChinese ? '应用配置' : 'App configuration',
-                                  color: AppColors.warning,
-                                  onTap: () => _showSystemSettings(context, isChinese),
-                                ),
-                                _buildManagementCard(
-                                  context,
-                                  icon: Icons.report,
-                                  title: isChinese ? '生成报告' : 'Generate Report',
-                                  subtitle: isChinese ? '导出数据报告' : 'Export data report',
-                                  color: AppColors.info,
-                                  onTap: () => _showReportGeneration(context, isChinese),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // 快速统计卡片
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    isChinese ? '今日概览' : 'Today Overview',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _buildStatItem(
-                                          Icons.person_add,
-                                          '12',
-                                          isChinese ? '新用户' : 'New Users',
-                                          AppColors.primary,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _buildStatItem(
-                                          Icons.quiz,
-                                          '8',
-                                          isChinese ? '新问卷' : 'New Surveys',
-                                          AppColors.success,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _buildStatItem(
-                                          Icons.feedback,
-                                          '5',
-                                          isChinese ? '新反馈' : 'New Feedback',
-                                          AppColors.warning,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            // 游客：显示原有功能区
-                            // 搜索导航条
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(25),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: InkWell(
-                                onTap: () => Navigator.pushNamed(context, '/search'),
-                                borderRadius: BorderRadius.circular(25),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.search,
-                                      color: AppColors.textSecondary,
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      isChinese ? '搜索景点、文化、美食...' : 'Search spots, culture, food...',
-                                      style: TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(15),
-                                      ),
-                                      child: Text(
-                                        isChinese ? '搜索' : 'Search',
-                                        style: TextStyle(
-                                          color: AppColors.primary,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // 功能模块网格
-                            GridView.count(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 0.9,
-                              children: [
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.translate,
-                                  title: isChinese ? '翻译助手' : 'Translation',
-                                  color: AppColors.primary,
-                                  onTap: () => Navigator.pushNamed(context, '/translation'),
-                                ),
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.map,
-                                  title: isChinese ? '地图导航' : 'Map & Navigation',
-                                  color: AppColors.secondary,
-                                  onTap: () => Navigator.pushNamed(context, '/map'),
-                                ),
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.mic,
-                                  title: isChinese ? '语音助手' : 'Voice Assistant',
-                                  color: AppColors.accent,
-                                  onTap: () => Navigator.pushNamed(context, '/voice'),
-                                ),
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.book,
-                                  title: isChinese ? '北京中轴线术语库' : 'Beijing Central Axis Terminology Database',
-                                  color: AppColors.success,
-                                  onTap: () => Navigator.pushNamed(context, '/terminology'),
-                                ),
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.book,
-                                  title: isChinese ? '文化手册' : 'Handbook',
-                                  color: AppColors.warning,
-                                  onTap: () => Navigator.pushNamed(context, '/handbook'),
-                                ),
-                                _buildFeatureCard(
-                                  context,
-                                  icon: Icons.quiz,
-                                  title: isChinese ? '文化调查' : 'Survey',
-                                  color: AppColors.info,
-                                  onTap: () => Navigator.pushNamed(context, '/survey'),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 24),
-                            
-                            // 快速访问
-                            Text(
-                              isChinese ? '快速访问' : 'Quick Access',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildQuickAccessCard(
-                                    context,
-                                    icon: Icons.photo_library,
-                                    title: isChinese ? '照片墙' : 'Photo Wall',
-                                    color: AppColors.primary,
-                                    onTap: () => Navigator.pushNamed(context, '/photo'),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  _buildQuickAccessCard(
-                                    context,
-                                    icon: Icons.video_library,
-                                    title: isChinese ? '视频' : 'Videos',
-                                    color: AppColors.secondary,
-                                    onTap: () => Navigator.pushNamed(context, '/video'),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  _buildQuickAccessCard(
-                                    context,
-                                    icon: Icons.animation,
-                                    title: isChinese ? '动画' : 'Animation',
-                                    color: AppColors.accent,
-                                    onTap: () => Navigator.pushNamed(context, '/animation'),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  _buildQuickAccessCard(
-                                    context,
-                                    icon: Icons.museum,
-                                    title: isChinese ? '文化' : 'Culture',
-                                    color: AppColors.success,
-                                    onTap: () => Navigator.pushNamed(context, '/culture'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            const SizedBox(height: 32),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          _DraggableAIBall(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 28,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAccessCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return RepaintBoundary(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 110, // 进一步增加宽度
-          constraints: const BoxConstraints(
-            minHeight: 80,
-            maxHeight: 100,
-          ),
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Flexible(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    height: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManagementCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 28,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w300,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showUserManagement(BuildContext context, bool isChinese) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: ListView(
-                    controller: scrollController,
-                  children: [
-                    Text(
-                      isChinese ? '用户管理' : 'User Management',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FutureBuilder<List<User>>(
-                      future: UserService.fetchUsers(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Text(
-                                isChinese ? '加载用户列表失败: ${snapshot.error}' : 'Failed to load users: ${snapshot.error}',
-                                style: const TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          );
-                        }
-
-                        final users = snapshot.data ?? [];
-                        if (users.isEmpty) {
-                          return Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Text(
-                                isChinese ? '暂无用户数据' : 'No users found',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                            ),
-                          );
-                        }
-
-                        return Column(
-                          children: users.map((user) => _buildUserCard(
-                            user.username,
-                            user.email,
-                            user.role == UserRole.guide ? (isChinese ? '导游' : 'Guide') : (isChinese ? '游客' : 'Tourist'),
-                            isChinese,
-                            user: user,
-                          )).toList(),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showContentManagement(BuildContext context, bool isChinese) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                isChinese ? '内容管理' : 'Content Management',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildContentCard('故宫', 'Forbidden City', isChinese),
-              _buildContentCard('天坛', 'Temple of Heaven', isChinese),
-              _buildContentCard('前门', 'Qianmen', isChinese),
-              _buildContentCard('钟鼓楼', 'Bell and Drum Towers', isChinese),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFeedbackAnalysis(BuildContext context, bool isChinese) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: ListView(
-                  controller: scrollController,
-                  shrinkWrap: true,
-                  children: [
-                    Text(
-                      isChinese ? '反馈分析' : 'Feedback Analysis',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildFeedbackCard('功能建议', '希望增加更多景点信息', 5, isChinese),
-                    _buildFeedbackCard('界面优化', '界面很美观，用户体验很好', 5, isChinese),
-                    _buildFeedbackCard('内容建议', '建议增加更多历史文化内容', 4, isChinese),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showSystemSettings(BuildContext context, bool isChinese) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.8,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                isChinese ? '系统设置' : 'System Settings',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildSettingItem(Icons.notifications, isChinese ? '通知设置' : 'Notifications', isChinese),
-              _buildSettingItem(Icons.language, isChinese ? '语言设置' : 'Language', isChinese),
-              _buildSettingItem(Icons.security, isChinese ? '安全设置' : 'Security', isChinese),
-              _buildSettingItem(Icons.backup, isChinese ? '数据备份' : 'Data Backup', isChinese),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showReportGeneration(BuildContext context, bool isChinese) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.7,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: ListView(
-                    controller: scrollController,
-                    children: [
-                      Text(
-                        isChinese ? '生成报告' : 'Generate Report',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildReportOption('用户数据报告', 'User Data Report', isChinese),
-                      _buildReportOption('调查问卷报告', 'Survey Report', isChinese),
-                      _buildReportOption('反馈分析报告', 'Feedback Report', isChinese),
-                      _buildReportOption('照片统计报告', 'Photo Report', isChinese),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showPhotoManagement(BuildContext context, bool isChinese) {
-    Navigator.pushNamed(context, '/photo_management');
-  }
-
-  void _showBatchUploadDialog(BuildContext context, bool isChinese) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '批量上传照片' : 'Batch Upload Photos'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isChinese ? '选择要上传的照片：' : 'Select photos to upload:'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.photo_camera),
-                  label: Text(isChinese ? '拍照' : 'Camera'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showUploadProgress(context, isChinese);
-                  },
-                ),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.photo_library),
-                  label: Text(isChinese ? '相册' : 'Gallery'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showUploadProgress(context, isChinese);
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showUploadProgress(BuildContext context, bool isChinese) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '上传中...' : 'Uploading...'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const LinearProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(isChinese ? '正在上传照片，请稍候...' : 'Uploading photos, please wait...'),
-          ],
-        ),
-      ),
-    );
-    
-    // 模拟上传进度
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isChinese ? '照片上传成功！' : 'Photos uploaded successfully!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    });
-  }
-
-  Widget _buildPhotoStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhotoCategoryChip(String label, String labelEn, bool isSelected, bool isChinese) {
-    return FilterChip(
-      label: Text(isChinese ? label : labelEn),
-      selected: isSelected,
-      onSelected: (selected) {
-        // 处理分类选择
-      },
-      selectedColor: AppColors.accent.withOpacity(0.2),
-      checkmarkColor: AppColors.accent,
-    );
-  }
-
-  Widget _buildPhotoItem(String title, String author, String date, bool isApproved, bool isChinese) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            // 照片缩略图
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.photo, color: AppColors.accent),
-            ),
-            
-            const SizedBox(width: 12),
-            
-            // 照片信息
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    isChinese ? '上传者：$author' : 'Uploader: $author',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                  Text(
-                    date,
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                  ),
                 ],
               ),
             ),
-            
-            // 状态和操作按钮
-            Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isApproved ? AppColors.success.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    isApproved ? (isChinese ? '已审核' : 'Approved') : (isChinese ? '待审核' : 'Pending'),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isApproved ? AppColors.success : AppColors.warning,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.visibility, size: 16),
-                      onPressed: () {
-                        // 预览照片
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 16),
-                      onPressed: () {
-                        // 编辑照片信息
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 16),
-                      onPressed: () {
-                        // 删除照片
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserCard(String username, String email, String role, bool isChinese, {User? user}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: role == '导游' || role == 'Guide' ? AppColors.primary : AppColors.secondary,
-          child: Text(
-            username[0].toUpperCase(),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-        title: Text(
-          username,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(email),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: role == '导游' || role == 'Guide' ? AppColors.primary : AppColors.secondary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    role,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                if (user != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: user.isActive ? Colors.green : Colors.red,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      user.isActive ? (isChinese ? '活跃' : 'Active') : (isChinese ? '禁用' : 'Inactive'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (user != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                '${isChinese ? '注册时间' : 'Registered'}: ${user.createdAt.toString().split(' ')[0]}',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContentCard(String name, String nameEn, bool isChinese) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: AppColors.accent.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.location_on, color: AppColors.accent),
-        ),
-        title: Text(isChinese ? name : nameEn),
-        subtitle: Text(isChinese ? '点击编辑景点信息' : 'Tap to edit spot info'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: AppColors.accent),
-              onPressed: () {
-                _showSpotEditDialog(name, nameEn, isChinese);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: AppColors.error),
-              onPressed: () {
-                _showDeleteConfirmDialog(name, nameEn, isChinese);
-              },
-            ),
-          ],
-        ),
-        onTap: () {
-          _showSpotEditDialog(name, nameEn, isChinese);
-        },
-      ),
-    );
-  }
-
-  Widget _buildFeedbackCard(String category, String content, int rating, bool isChinese) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  category,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Row(
-                  children: List.generate(5, (index) => Icon(
-                    index < rating ? Icons.star : Icons.star_border,
-                    size: 16,
-                    color: Colors.amber,
-                  )),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(content),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSettingItem(IconData icon, String title, bool isChinese) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.warning),
-      title: Text(title),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: () {
-        _handleSettingTap(title, isChinese);
-      },
-    );
-  }
-
-  // 处理设置项点击
-  void _handleSettingTap(String title, bool isChinese) {
-    if (title.contains('通知') || title.contains('Notifications')) {
-      _showNotificationSettings(isChinese);
-    } else if (title.contains('语言') || title.contains('Language')) {
-      _showLanguageSettings(isChinese);
-    } else if (title.contains('安全') || title.contains('Security')) {
-      _showSecuritySettings(isChinese);
-    } else if (title.contains('备份') || title.contains('Backup')) {
-      _showDataBackupSettings(isChinese);
-    }
-  }
-
-  // 通知设置
-  void _showNotificationSettings(bool isChinese) {
-    bool pushNotifications = true;
-    bool emailNotifications = false;
-    bool soundEnabled = true;
-    bool vibrationEnabled = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Text(
-                      isChinese ? '通知设置' : 'Notification Settings',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 推送通知
-                    SwitchListTile(
-                      title: Text(isChinese ? '推送通知' : 'Push Notifications'),
-                      subtitle: Text(isChinese ? '接收应用推送消息' : 'Receive app push messages'),
-                      value: pushNotifications,
-                      onChanged: (value) {
-                        setState(() {
-                          pushNotifications = value;
-                        });
-                      },
-                    ),
-
-                    // 邮件通知
-                    SwitchListTile(
-                      title: Text(isChinese ? '邮件通知' : 'Email Notifications'),
-                      subtitle: Text(isChinese ? '接收邮件提醒' : 'Receive email alerts'),
-                      value: emailNotifications,
-                      onChanged: (value) {
-                        setState(() {
-                          emailNotifications = value;
-                        });
-                      },
-                    ),
-
-                    // 声音提醒
-                    SwitchListTile(
-                      title: Text(isChinese ? '声音提醒' : 'Sound Alerts'),
-                      subtitle: Text(isChinese ? '通知时播放声音' : 'Play sound for notifications'),
-                      value: soundEnabled,
-                      onChanged: (value) {
-                        setState(() {
-                          soundEnabled = value;
-                        });
-                      },
-                    ),
-
-                    // 震动提醒
-                    SwitchListTile(
-                      title: Text(isChinese ? '震动提醒' : 'Vibration'),
-                      subtitle: Text(isChinese ? '通知时震动' : 'Vibrate for notifications'),
-                      value: vibrationEnabled,
-                      onChanged: (value) {
-                        setState(() {
-                          vibrationEnabled = value;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isChinese ? '通知设置已保存' : 'Notification settings saved'),
-                          ),
-                        );
-                      },
-                      child: Text(isChinese ? '保存设置' : 'Save Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 语言设置
-  void _showLanguageSettings(bool isChinese) {
-    final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
-    String selectedLanguage = isChinese ? 'zh' : 'en';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.5,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Text(
-                      isChinese ? '语言设置' : 'Language Settings',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 中文选项
-                    RadioListTile<String>(
-                      title: const Text('中文'),
-                      subtitle: const Text('简体中文'),
-                      value: 'zh',
-                      groupValue: selectedLanguage,
-                      onChanged: (value) {
-                        setState(() {
-                          selectedLanguage = value!;
-                        });
-                      },
-                    ),
-
-                    // 英文选项
-                    RadioListTile<String>(
-                      title: const Text('English'),
-                      subtitle: const Text('English'),
-                      value: 'en',
-                      groupValue: selectedLanguage,
-                      onChanged: (value) {
-                        setState(() {
-                          selectedLanguage = value!;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        // 实际切换语言
-                        final newLocale = selectedLanguage == 'zh' ? AppLocale.zh : AppLocale.en;
-                        localeProvider.setLocale(newLocale);
-
-                        Navigator.pop(context);
-
-                        // 显示切换成功提示
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              selectedLanguage == 'zh'
-                                ? '语言已切换为中文'
-                                : 'Language switched to English'
-                            ),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      },
-                      child: Text(isChinese ? '应用设置' : 'Apply Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 安全设置
-  void _showSecuritySettings(bool isChinese) {
-    bool biometricEnabled = false;
-    bool autoLockEnabled = true;
-    String lockTimeout = '5';
-    bool dataEncryption = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.8,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Text(
-                      isChinese ? '安全设置' : 'Security Settings',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 生物识别
-                    SwitchListTile(
-                      title: Text(isChinese ? '生物识别' : 'Biometric Authentication'),
-                      subtitle: Text(isChinese ? '使用指纹或面部识别' : 'Use fingerprint or face recognition'),
-                      value: biometricEnabled,
-                      onChanged: (value) {
-                        setState(() {
-                          biometricEnabled = value;
-                        });
-                      },
-                    ),
-
-                    // 自动锁定
-                    SwitchListTile(
-                      title: Text(isChinese ? '自动锁定' : 'Auto Lock'),
-                      subtitle: Text(isChinese ? '应用进入后台时自动锁定' : 'Lock app when in background'),
-                      value: autoLockEnabled,
-                      onChanged: (value) {
-                        setState(() {
-                          autoLockEnabled = value;
-                        });
-                      },
-                    ),
-
-                    // 锁定超时
-                    ListTile(
-                      title: Text(isChinese ? '锁定超时' : 'Lock Timeout'),
-                      subtitle: Text(isChinese ? '自动锁定延迟时间' : 'Auto lock delay time'),
-                      trailing: DropdownButton<String>(
-                        value: lockTimeout,
-                        items: [
-                          DropdownMenuItem(value: '1', child: Text(isChinese ? '1分钟' : '1 min')),
-                          DropdownMenuItem(value: '5', child: Text(isChinese ? '5分钟' : '5 min')),
-                          DropdownMenuItem(value: '10', child: Text(isChinese ? '10分钟' : '10 min')),
-                          DropdownMenuItem(value: '30', child: Text(isChinese ? '30分钟' : '30 min')),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            lockTimeout = value!;
-                          });
-                        },
-                      ),
-                    ),
-
-                    // 数据加密
-                    SwitchListTile(
-                      title: Text(isChinese ? '数据加密' : 'Data Encryption'),
-                      subtitle: Text(isChinese ? '加密本地存储数据' : 'Encrypt local stored data'),
-                      value: dataEncryption,
-                      onChanged: (value) {
-                        setState(() {
-                          dataEncryption = value;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 10),
-                    const Divider(),
-
-                    // 修改密码
-                    ListTile(
-                      leading: const Icon(Icons.lock_outline, color: AppColors.warning),
-                      title: Text(isChinese ? '修改密码' : 'Change Password'),
-                      subtitle: Text(isChinese ? '更新登录密码' : 'Update login password'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showChangePasswordDialog(isChinese);
-                      },
-                    ),
-
-                    // 清除数据
-                    ListTile(
-                      leading: const Icon(Icons.delete_forever, color: AppColors.error),
-                      title: Text(isChinese ? '清除所有数据' : 'Clear All Data'),
-                      subtitle: Text(isChinese ? '删除所有本地数据' : 'Delete all local data'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showClearDataDialog(isChinese);
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isChinese ? '安全设置已保存' : 'Security settings saved'),
-                          ),
-                        );
-                      },
-                      child: Text(isChinese ? '保存设置' : 'Save Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 数据备份设置
-  void _showDataBackupSettings(bool isChinese) {
-    bool autoBackup = true;
-    String backupFrequency = 'daily';
-    bool cloudBackup = false;
-    String lastBackup = '2024-01-15 14:30';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.8,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    Text(
-                      isChinese ? '数据备份' : 'Data Backup',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 自动备份
-                    SwitchListTile(
-                      title: Text(isChinese ? '自动备份' : 'Auto Backup'),
-                      subtitle: Text(isChinese ? '定期自动备份数据' : 'Automatically backup data regularly'),
-                      value: autoBackup,
-                      onChanged: (value) {
-                        setState(() {
-                          autoBackup = value;
-                        });
-                      },
-                    ),
-
-                    // 备份频率
-                    ListTile(
-                      title: Text(isChinese ? '备份频率' : 'Backup Frequency'),
-                      subtitle: Text(isChinese ? '设置备份间隔' : 'Set backup interval'),
-                      trailing: DropdownButton<String>(
-                        value: backupFrequency,
-                        items: [
-                          DropdownMenuItem(value: 'daily', child: Text(isChinese ? '每日' : 'Daily')),
-                          DropdownMenuItem(value: 'weekly', child: Text(isChinese ? '每周' : 'Weekly')),
-                          DropdownMenuItem(value: 'monthly', child: Text(isChinese ? '每月' : 'Monthly')),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            backupFrequency = value!;
-                          });
-                        },
-                      ),
-                    ),
-
-                    // 云端备份
-                    SwitchListTile(
-                      title: Text(isChinese ? '云端备份' : 'Cloud Backup'),
-                      subtitle: Text(isChinese ? '备份到云端存储' : 'Backup to cloud storage'),
-                      value: cloudBackup,
-                      onChanged: (value) {
-                        setState(() {
-                          cloudBackup = value;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 10),
-                    const Divider(),
-
-                    // 最后备份时间
-                    ListTile(
-                      leading: const Icon(Icons.schedule, color: AppColors.info),
-                      title: Text(isChinese ? '最后备份' : 'Last Backup'),
-                      subtitle: Text(lastBackup),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // 立即备份
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        _performBackup(isChinese);
-                      },
-                      icon: const Icon(Icons.backup),
-                      label: Text(isChinese ? '立即备份' : 'Backup Now'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // 恢复数据
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showRestoreDialog(isChinese);
-                      },
-                      icon: const Icon(Icons.restore),
-                      label: Text(isChinese ? '恢复数据' : 'Restore Data'),
-                    ),
-
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(isChinese ? '备份设置已保存' : 'Backup settings saved'),
-                          ),
-                        );
-                      },
-                      child: Text(isChinese ? '保存设置' : 'Save Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 修改密码对话框
-  void _showChangePasswordDialog(bool isChinese) {
-    final oldPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '修改密码' : 'Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: oldPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: isChinese ? '当前密码' : 'Current Password',
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: newPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: isChinese ? '新密码' : 'New Password',
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: isChinese ? '确认新密码' : 'Confirm New Password',
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(isChinese ? '密码修改成功' : 'Password changed successfully'),
-                ),
-              );
-            },
-            child: Text(isChinese ? '确认' : 'Confirm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 清除数据确认对话框
-  void _showClearDataDialog(bool isChinese) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '清除所有数据' : 'Clear All Data'),
-        content: Text(
-          isChinese
-            ? '此操作将删除所有本地数据，包括照片、行程、设置等。此操作不可撤销，确定要继续吗？'
-            : 'This will delete all local data including photos, trips, settings, etc. This action cannot be undone. Are you sure?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(isChinese ? '所有数据已清除' : 'All data cleared'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            },
-            child: Text(isChinese ? '确认清除' : 'Confirm Clear'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 执行备份
-  void _performBackup(bool isChinese) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(isChinese ? '正在备份数据...' : 'Backing up data...'),
-          ],
-        ),
-      ),
-    );
-
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pop(context); // 关闭加载对话框
-      Navigator.pop(context); // 关闭备份设置
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isChinese ? '数据备份完成' : 'Data backup completed'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    });
-  }
-
-  // 恢复数据对话框
-  void _showRestoreDialog(bool isChinese) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '恢复数据' : 'Restore Data'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.cloud_download),
-              title: Text(isChinese ? '从云端恢复' : 'Restore from Cloud'),
-              subtitle: Text(isChinese ? '2024-01-15 14:30' : '2024-01-15 14:30'),
-              onTap: () {
-                Navigator.pop(context);
-                _performRestore(isChinese, 'cloud');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.folder),
-              title: Text(isChinese ? '从本地文件恢复' : 'Restore from Local File'),
-              subtitle: Text(isChinese ? '选择备份文件' : 'Select backup file'),
-              onTap: () {
-                Navigator.pop(context);
-                _performRestore(isChinese, 'local');
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 执行恢复
-  void _performRestore(bool isChinese, String source) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(isChinese ? '正在恢复数据...' : 'Restoring data...'),
-          ],
-        ),
-      ),
-    );
-
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isChinese
-              ? '数据恢复完成，请重启应用'
-              : 'Data restore completed, please restart app'
-          ),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    });
-  }
-
-  // 显示景点编辑对话框
-  void _showSpotEditDialog(String name, String nameEn, bool isChinese) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '编辑景点信息' : 'Edit Spot Info'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              decoration: InputDecoration(
-                labelText: isChinese ? '中文名称' : 'Chinese Name',
-                hintText: name,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                labelText: isChinese ? '英文名称' : 'English Name',
-                hintText: nameEn,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(isChinese ? '景点信息已更新' : 'Spot info updated'),
-                ),
-              );
-            },
-            child: Text(isChinese ? '保存' : 'Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 显示删除确认对话框
-  void _showDeleteConfirmDialog(String name, String nameEn, bool isChinese) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isChinese ? '确认删除' : 'Confirm Delete'),
-        content: Text(
-          isChinese
-            ? '确定要删除景点"$name"吗？此操作不可撤销。'
-            : 'Are you sure you want to delete "$nameEn"? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isChinese ? '取消' : 'Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(isChinese ? '景点已删除' : 'Spot deleted'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            },
-            child: Text(isChinese ? '删除' : 'Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReportOption(String title, String titleEn, bool isChinese) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.info.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.description, color: AppColors.info),
-        ),
-        title: Text(isChinese ? title : titleEn),
-        subtitle: Text(isChinese ? '点击生成报告' : 'Click to generate report'),
-        trailing: const Icon(Icons.download),
-        onTap: () {
-          _generateReport(title, titleEn, isChinese);
-        },
-      ),
-    );
-  }
-
-  // 生成报告
-  void _generateReport(String title, String titleEn, bool isChinese) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(isChinese ? '正在生成报告...' : 'Generating report...'),
-          ],
-        ),
-      ),
-    );
-
-    // 模拟报告生成过程
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pop(context); // 关闭加载对话框
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(isChinese ? '报告生成完成' : 'Report Generated'),
-          content: Text(
-            isChinese
-              ? '报告"${title}"已生成完成，已保存到下载文件夹。'
-              : 'Report "$titleEn" has been generated and saved to downloads folder.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(isChinese ? '确定' : 'OK'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isChinese ? '报告已打开' : 'Report opened'),
-                  ),
-                );
-              },
-              child: Text(isChinese ? '打开报告' : 'Open Report'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildStatItem(
-    IconData icon,
-    String value,
-    String label,
-    Color color,
-  ) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          size: 24,
-          color: color,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w300,
-            color: AppColors.textSecondary,
           ),
         ),
       ],
     );
   }
-}
 
-// 在文件末尾添加可拖动悬浮球组件
-class _DraggableAIBall extends StatefulWidget {
-  @override
-  State<_DraggableAIBall> createState() => _DraggableAIBallState();
-}
-
-class _DraggableAIBallState extends State<_DraggableAIBall> {
-  Offset position = const Offset(0, 0);
-  late double screenWidth;
-  late double screenHeight;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final size = MediaQuery.of(context).size;
-    screenWidth = size.width;
-    screenHeight = size.height;
-    if (position == Offset.zero) {
-      // 初始放在右下角
-      position = Offset(screenWidth - 80, screenHeight - 180);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: position.dx,
-      top: position.dy,
-      child: Draggable(
-        feedback: _buildBall(),
-        childWhenDragging: Container(),
-        onDragEnd: (details) {
-          setState(() {
-            double x = details.offset.dx;
-            double y = details.offset.dy;
-            // 限制在屏幕范围内
-            x = x.clamp(0, screenWidth - 60);
-            y = y.clamp(0, screenHeight - 60);
-            position = Offset(x, y);
-          });
-        },
-        child: GestureDetector(
-          onTap: () {
-            showDialog(
-              context: context,
-              builder: (context) => Dialog(
-                insetPadding: const EdgeInsets.all(16),
-                backgroundColor: Colors.transparent,
-                child: SizedBox(
-                  width: screenWidth * 0.95,
-                  height: screenHeight * 0.8,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Material(
-                      child: AIAssistantScreen(),
+  Widget _buildProfileSection({required String title, required List<Map<String, dynamic>> items}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: kPrimaryColor,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 1,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              return Column(
+                children: [
+                  GestureDetector(
+                    onTap: item['onTap'] as VoidCallback?,
+                    child: Container(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: kPrimaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            item['icon'] as IconData,
+                            color: kPrimaryColor,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item['title'] as String,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item['subtitle'] as String,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey[400],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-          child: _buildBall(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBall() {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+                  if (index < items.length - 1)
+                    Divider(
+                      height: 1,
+                      indent: 72,
+                      endIndent: 16,
+                      color: Colors.grey[200],
+                    ),
+                ],
+              );
+            }).toList(),
           ),
-        ],
-      ),
-      child: const Icon(
-        Icons.smart_toy,
-        color: Colors.white,
-        size: 30,
-      ),
+        ),
+      ],
     );
   }
 } 

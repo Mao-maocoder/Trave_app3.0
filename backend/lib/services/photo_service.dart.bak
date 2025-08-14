@@ -1,0 +1,312 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:http_parser/http_parser.dart';
+import '../models/user.dart';
+import '../utils/api_host.dart';
+import 'auth_service.dart';
+
+class PhotoService {
+  String get baseUrl => getApiBaseUrl();
+
+  // 获取照片列表
+  Future<List<Map<String, dynamic>>> getPhotos() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/photos'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('Failed to load photos');
+      }
+    } catch (e) {
+      throw Exception('Failed to load photos: $e');
+    }
+  }
+
+  // 上传照片
+  Future<Map<String, dynamic>> uploadPhoto({
+    required File file,
+    required String userId,
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/photos/upload');
+      
+      var request = http.MultipartRequest('POST', url)
+        ..files.add(await http.MultipartFile.fromPath(
+          'photo',
+          file.path,
+          contentType: MediaType('image', 'jpeg'),
+        ))
+        ..fields['userId'] = userId;
+
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        return json.decode(responseBody);
+      } else {
+        throw Exception('Failed to upload photo: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to upload photo: $e');
+    }
+  }
+
+  // 原有的静态方法
+  static Future<Map<String, dynamic>> uploadPhoto({
+    required File photo,
+    required String title,
+    required String titleEn,
+    required String description,
+    required String descriptionEn,
+    required String category,
+    required String categoryEn,
+    required String token,
+  }) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(getApiBaseUrl(path: '/api/photos/upload')),
+      );
+
+      // 添加表单数据
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['title'] = title;
+      request.fields['titleEn'] = titleEn;
+      request.fields['description'] = description;
+      request.fields['descriptionEn'] = descriptionEn;
+      request.fields['category'] = category;
+      request.fields['categoryEn'] = categoryEn;
+
+      // 添加照片文件
+      if (kIsWeb) {
+        // Web环境下的处理方式
+        throw Exception('Web环境下请使用uploadPhotoFromBytes方法');
+      } else {
+        // 移动端的处理方式
+        var stream = http.ByteStream(photo.openRead());
+        var length = await photo.length();
+        var multipartFile = http.MultipartFile(
+          'photo',
+          stream,
+          length,
+          filename: photo.path.split('/').last,
+          contentType: MediaType('image', 'jpeg'),
+        );
+        request.files.add(multipartFile);
+      }
+
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+      var result = json.decode(responseData);
+
+      if (response.statusCode == 200) {
+        return result;
+      } else {
+        throw Exception(result['message'] ?? '上传失败');
+      }
+    } catch (e) {
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // Web环境专用的上传方法
+  static Future<Map<String, dynamic>> uploadPhotosFromBytes({
+    required List<PlatformFile> files,
+    required String spotName,
+    required User user,
+    String? title,
+    String? description,
+  }) async {
+    try {
+      print('开始上传照片到: ${getApiBaseUrl(path: '/api/photos/upload')}');
+      print('上传文件数量: ${files.length}');
+      
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(getApiBaseUrl(path: '/api/photos/upload')),
+      );
+
+      // 添加表单数据
+      request.fields['spotName'] = spotName;
+      request.fields['uploader'] = user.username;
+      request.fields['userRole'] = user.role.toString().split('.').last;
+      if (title != null) request.fields['title'] = title;
+      if (description != null) request.fields['description'] = description;
+
+      // 添加照片文件
+      for (int i = 0; i < files.length; i++) {
+        final file = files[i];
+        if (file.bytes != null && file.bytes!.isNotEmpty) {
+          print('添加文件: ${file.name}, 大小: ${file.bytes!.length} bytes');
+          
+          // 处理文件类型
+          String mimeType = 'image/jpeg'; // 默认类型
+          if (file.name.toLowerCase().endsWith('.png')) {
+            mimeType = 'image/png';
+          } else if (file.name.toLowerCase().endsWith('.gif')) {
+            mimeType = 'image/gif';
+          }
+          
+          var multipartFile = http.MultipartFile.fromBytes(
+            'photos',
+            file.bytes!,
+            filename: file.name,
+            contentType: MediaType.parse(mimeType),
+          );
+          request.files.add(multipartFile);
+        } else {
+          print('警告: 文件 ${file.name} 没有有效数据');
+        }
+      }
+
+      print('发送请求...');
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+      
+      print('响应状态码: ${response.statusCode}');
+      print('响应内容: $responseData');
+      
+      // 检查响应是否为HTML错误页面
+      if (responseData.trim().startsWith('<!DOCTYPE') || responseData.trim().startsWith('<html')) {
+        throw Exception('服务器返回了错误页面，请检查API端点是否正确');
+      }
+      
+      var result = json.decode(responseData);
+
+      if (response.statusCode == 200) {
+        print('上传成功');
+        return result;
+      } else {
+        throw Exception(result['message'] ?? '上传失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('上传异常: $e');
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // 获取照片列表
+  static Future<Map<String, dynamic>> getPhotos({
+    String? status,
+    String? spotName,
+    String? uploader,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      var queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (status != null) queryParams['status'] = status;
+      if (spotName != null) queryParams['spotName'] = spotName;
+      if (uploader != null) queryParams['uploader'] = uploader;
+
+      var uri = Uri.parse('$baseUrl/api/photos').replace(queryParameters: queryParams);
+      print('获取照片列表URL: $uri');
+      
+      var response = await AuthService.authorizedRequest(
+        uri,
+        method: 'GET',
+      );
+
+      print('照片列表响应状态码: ${response.statusCode}');
+      print('照片列表响应内容: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('获取照片列表失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('获取照片列表异常: $e');
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // 审核照片
+  static Future<Map<String, dynamic>> reviewPhoto({
+    required String photoId,
+    required String status,
+    String? reason,
+  }) async {
+    try {
+      var response = await AuthService.authorizedRequest(
+        Uri.parse('$baseUrl/api/photos/$photoId/review'),
+        method: 'POST',
+        body: json.encode({
+          'status': status,
+          'reason': reason,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('审核失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // 删除照片
+  static Future<Map<String, dynamic>> deletePhoto(String photoId) async {
+    try {
+      var response = await AuthService.authorizedRequest(
+        Uri.parse('$baseUrl/api/photos/$photoId'),
+        method: 'DELETE',
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('删除失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // 获取照片统计
+  static Future<Map<String, dynamic>> getPhotoStats() async {
+    try {
+      var response = await AuthService.authorizedRequest(
+        Uri.parse('$baseUrl/api/photos/stats'),
+        method: 'GET',
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('获取统计失败，状态码: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('网络错误: $e');
+    }
+  }
+
+  // 获取照片URL
+  static String getPhotoUrl(String photoPath) {
+    // 如果photoPath已经是完整URL，直接返回
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://')) {
+      return photoPath;
+    }
+    
+    // 如果是相对路径，拼接完整URL
+    final baseUrl = getApiBaseUrl();
+    if (photoPath.startsWith('/')) {
+      return baseUrl + photoPath;
+    } else {
+      return baseUrl + '/' + photoPath;
+    }
+  }
+} 
