@@ -2497,6 +2497,24 @@ app.post('/api/chats/private', (req, res) => {
 });
 
 // ========== 静态托管Flutter Web前端和兜底路由 ==========
+// 兼容移动端访问含中文文件名的静态资源：
+// 一些构建环境会将文件名写成百分号编码（例如 %E6%95%85%E5%AE%AB.png），
+// 而浏览器请求会在到达 Express 前被自动 decode 成中文（故宫.png），
+// 导致默认的 express.static 找不到文件。在这里优先用 originalUrl 定位物理文件，
+// 当磁盘存在对应的百分号编码文件时直接返回，避免 404。
+app.get(/^\/assets\/.*/, (req, res, next) => {
+  try {
+    const originalPath = req.originalUrl.split('?')[0].replace(/^\//, '');
+    const filePath = path.join(__dirname, 'web', originalPath);
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  } catch (e) {
+    // 忽略，交给后续中间件处理
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'web')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'web/index.html'));
