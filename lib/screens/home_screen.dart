@@ -713,7 +713,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildFeatureGrid() {
     final features = [
-      {'icon': Icons.music_note, 'title': '《中轴》音乐', 'route': '/music'},
+      {'icon': Icons.panorama, 'title': '全景故宫', 'url': 'https://pano.dpm.org.cn/#/panorama?panorama_id=20&scene_id=1&scene_name=scene_1_summer'},
       {'icon': Icons.translate, 'title': '智能翻译', 'route': '/translation'},
       {'icon': Icons.photo_library, 'title': '照片墙', 'route': '/photo'},
       {'icon': Icons.smart_toy, 'title': 'AI助手', 'route': '/ai_assistant'},

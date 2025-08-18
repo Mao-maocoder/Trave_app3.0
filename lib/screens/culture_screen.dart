@@ -5,6 +5,7 @@ import '../providers/locale_provider.dart';
 import '../widgets/optimized_card.dart';
 import '../services/food_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 class CultureScreen extends StatefulWidget {
   const CultureScreen({Key? key}) : super(key: key);
@@ -311,6 +312,12 @@ class _CultureScreenState extends State<CultureScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
+                      // 本地视频：中轴纪录
+                      _buildLocalVideoCard(
+                        context,
+                        isChinese ? '中轴纪录短片' : 'Central Axis Short Film',
+                        'assets/videos/zhongzhou.mp4',
+                      ),
                       _buildVideoCard(
                         context,
                         isChinese ? 'AI春晚非遗大作《中轴线》' : 'AI Spring Festival Gala: Central Axis',
@@ -574,3 +581,94 @@ Widget _buildVideoCard(BuildContext context, String title, String platform, Stri
     ),
   );
 } 
+
+Widget _buildLocalVideoCard(BuildContext context, String title, String assetPath) {
+  return Card(
+    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+    child: ListTile(
+      leading: const Icon(Icons.movie, color: Colors.redAccent),
+      title: Text(title),
+      subtitle: const Text('本地视频'),
+      trailing: const Icon(Icons.play_circle_outline),
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => Dialog(
+            insetPadding: const EdgeInsets.all(16),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: _AssetVideoPlayer(assetPath: assetPath),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _AssetVideoPlayer extends StatefulWidget {
+  final String assetPath;
+  const _AssetVideoPlayer({Key? key, required this.assetPath}) : super(key: key);
+
+  @override
+  State<_AssetVideoPlayer> createState() => _AssetVideoPlayerState();
+}
+
+class _AssetVideoPlayerState extends State<_AssetVideoPlayer> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.asset(widget.assetPath)
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() => _initialized = true);
+        _controller.play();
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_initialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        VideoPlayer(_controller),
+        VideoProgressIndicator(_controller, allowScrubbing: true),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        Positioned(
+          bottom: 8,
+          right: 8,
+          child: IconButton(
+            icon: Icon(
+              _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}

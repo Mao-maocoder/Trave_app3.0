@@ -81,8 +81,10 @@ class AppTheme {
   static final ThemeData lightTheme = ThemeData(
     fontFamily: fontFamily,
     scaffoldBackgroundColor: backgroundColor,
-    backgroundColor: backgroundColor,
-    cardColor: cardBackground,
+    colorScheme: ColorScheme.light(
+      background: backgroundColor,
+      surface: cardBackground,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: backgroundColor,
       foregroundColor: textPrimary,
@@ -176,7 +178,7 @@ class AppTheme {
     ),
     
     // 现代化卡片样式 - 更丰富的阴影和边框
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
@@ -422,7 +424,7 @@ class AppTheme {
         ),
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
