@@ -76,14 +76,17 @@
 </head>
 <body>
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
+    window.addEventListener('load', function () {
+      const loader = (window._flutter && window._flutter.loader);
+      if (!loader) {
+        console.error('Flutter loader not found');
+        return;
+      }
+
+      loader.loadEntrypoint({
+        serviceWorker: { serviceWorkerVersion: serviceWorkerVersion },
+        onEntrypointLoaded: function (engineInitializer) {
+          engineInitializer.initializeEngine({ renderer: 'html' }).then(function (appRunner) {
             appRunner.runApp();
           });
         }
